@@ -1,8 +1,10 @@
 """Services for CalDAV integration."""
 
+import json
 import logging
 import re
 from datetime import date, datetime, timedelta
+from datetime import timezone as dt_timezone
 from typing import Optional
 from urllib.parse import unquote
 from uuid import uuid4
@@ -30,7 +32,7 @@ class CalDAVHTTPClient:
     and HTTP requests. All higher-level CalDAV consumers delegate to this.
     """
 
-    BASE_URI_PATH = "/api/v1.0/caldav"
+    BASE_URI_PATH = "/caldav"
     DEFAULT_TIMEOUT = 30
 
     def __init__(self):
@@ -45,11 +47,21 @@ class CalDAVHTTPClient:
         return key
 
     @classmethod
-    def build_base_headers(cls, email: str) -> dict:
-        """Build authentication headers for CalDAV requests."""
+    def build_base_headers(cls, user) -> dict:
+        """Build authentication headers for CalDAV requests.
+
+        Args:
+            user: Object with .email and .organization_id attributes.
+
+        Raises:
+            ValueError: If user.email is not set.
+        """
+        if not user.email:
+            raise ValueError("User has no email address")
         return {
             "X-Api-Key": cls.get_api_key(),
-            "X-Forwarded-User": email,
+            "X-Forwarded-User": user.email,
+            "X-CalDAV-Organization": str(user.organization_id),
         }
 
     def build_url(self, path: str, query: str = "") -> str:
@@ -70,7 +82,7 @@ class CalDAVHTTPClient:
     def request(  # noqa: PLR0913  # pylint: disable=too-many-arguments
         self,
         method: str,
-        email: str,
+        user,
         path: str,
         *,
         query: str = "",
@@ -80,7 +92,7 @@ class CalDAVHTTPClient:
         content_type: str | None = None,
     ) -> requests.Response:
         """Make an authenticated HTTP request to the CalDAV server."""
-        headers = self.build_base_headers(email)
+        headers = self.build_base_headers(user)
         if content_type:
             headers["Content-Type"] = content_type
         if extra_headers:
@@ -95,9 +107,13 @@ class CalDAVHTTPClient:
             timeout=timeout or self.DEFAULT_TIMEOUT,
         )
 
-    def get_dav_client(self, email: str) -> DAVClient:
-        """Return a configured caldav.DAVClient for the given user email."""
-        headers = self.build_base_headers(email)
+    def get_dav_client(self, user) -> DAVClient:
+        """Return a configured caldav.DAVClient for the given user.
+
+        Args:
+            user: Object with .email and .organization_id attributes.
+        """
+        headers = self.build_base_headers(user)
         caldav_url = f"{self.base_url}{self.BASE_URI_PATH}/"
         return DAVClient(
             url=caldav_url,
@@ -107,38 +123,58 @@ class CalDAVHTTPClient:
             headers=headers,
         )
 
-    def find_event_by_uid(self, email: str, uid: str) -> tuple[str | None, str | None]:
+    def find_event_by_uid(
+        self, user, uid: str
+    ) -> tuple[str | None, str | None, str | None]:
         """Find an event by UID across all of the user's calendars.
 
-        Returns (ical_data, href) or (None, None).
+        Returns (ical_data, href, etag) or (None, None, None).
         """
-        client = self.get_dav_client(email)
+        client = self.get_dav_client(user)
         try:
             principal = client.principal()
             for cal in principal.calendars():
                 try:
                     event = cal.object_by_uid(uid)
-                    return event.data, str(event.url.path)
+                    etag = getattr(event, "props", {}).get("{DAV:}getetag") or getattr(
+                        event, "etag", None
+                    )
+                    return event.data, str(event.url.path), etag
                 except caldav_lib.error.NotFoundError:
                     continue
-            logger.warning("Event UID %s not found in user %s calendars", uid, email)
-            return None, None
+            logger.warning(
+                "Event UID %s not found in user %s calendars", uid, user.email
+            )
+            return None, None, None
         except Exception:  # pylint: disable=broad-exception-caught
             logger.exception("CalDAV error looking up event %s", uid)
-            return None, None
+            return None, None, None
 
-    def put_event(self, email: str, href: str, ical_data: str) -> bool:
-        """PUT updated iCalendar data back to CalDAV. Returns True on success."""
+    def put_event(
+        self, user, href: str, ical_data: str, etag: str | None = None
+    ) -> bool:
+        """PUT updated iCalendar data back to CalDAV. Returns True on success.
+
+        If *etag* is provided, the request includes an If-Match header to
+        prevent lost updates from concurrent modifications.
+        """
         try:
+            extra_headers = {}
+            if etag:
+                extra_headers["If-Match"] = etag
             response = self.request(
                 "PUT",
-                email,
+                user,
                 href,
                 data=ical_data.encode("utf-8"),
                 content_type="text/calendar; charset=utf-8",
+                extra_headers=extra_headers or None,
             )
             if response.status_code in (200, 201, 204):
                 return True
+            if response.status_code == 412:
+                logger.warning("CalDAV PUT conflict (ETag mismatch) for %s", href)
+                return False
             logger.error(
                 "CalDAV PUT failed: %s %s",
                 response.status_code,
@@ -160,10 +196,10 @@ class CalDAVHTTPClient:
         cal = icalendar.Calendar.from_ical(ical_data)
         updated = False
 
+        target = f"mailto:{email.lower()}"
         for component in cal.walk("VEVENT"):
             for _name, attendee in component.property_items("ATTENDEE"):
-                attendee_val = str(attendee).lower()
-                if email.lower() in attendee_val:
+                if str(attendee).lower().strip() == target:
                     attendee.params["PARTSTAT"] = icalendar.vText(new_partstat)
                     updated = True
 
@@ -182,14 +218,19 @@ class CalDAVClient:
         self._http = CalDAVHTTPClient()
         self.base_url = self._http.base_url
 
+    def _calendar_url(self, calendar_path: str) -> str:
+        """Build a full URL for a calendar path, including the BASE_URI_PATH."""
+        return f"{self.base_url}{CalDAVHTTPClient.BASE_URI_PATH}{calendar_path}"
+
     def _get_client(self, user) -> DAVClient:
         """
         Get a CalDAV client for the given user.
 
         The CalDAV server requires API key authentication via Authorization header
         and X-Forwarded-User header for user identification.
+        Includes X-CalDAV-Organization when the user has an org.
         """
-        return self._http.get_dav_client(user.email)
+        return self._http.get_dav_client(user)
 
     def get_calendar_info(self, user, calendar_path: str) -> dict | None:
         """
@@ -197,7 +238,7 @@ class CalDAVClient:
         Returns dict with name, color, description or None if not found.
         """
         client = self._get_client(user)
-        calendar_url = f"{self.base_url}{calendar_path}"
+        calendar_url = self._calendar_url(calendar_path)
 
         try:
             calendar = client.calendar(url=calendar_url)
@@ -227,37 +268,53 @@ class CalDAVClient:
             logger.error("Failed to get calendar info from CalDAV: %s", str(e))
             return None
 
-    def create_calendar(
-        self, user, calendar_name: str, calendar_id: str, color: str = ""
+    def create_calendar(  # pylint: disable=too-many-arguments
+        self,
+        user,
+        calendar_name: str = "",
+        calendar_id: str = "",
+        color: str = "",
+        *,
+        name: str = "",
     ) -> str:
         """
         Create a new calendar in CalDAV server for the given user.
         Returns the CalDAV server path for the calendar.
         """
+        calendar_name = calendar_name or name
+        if not calendar_id:
+            calendar_id = str(uuid4())
+        if not color:
+            color = settings.DEFAULT_CALENDAR_COLOR
         client = self._get_client(user)
         principal = client.principal()
 
         try:
-            # Create calendar using caldav library
-            calendar = principal.make_calendar(name=calendar_name)
+            # Pass cal_id so the library uses our UUID for the path.
+            calendar = principal.make_calendar(name=calendar_name, cal_id=calendar_id)
 
-            # Set calendar color if provided
             if color:
                 calendar.set_properties([CalendarColor(color)])
 
-            # CalDAV server calendar path format: /calendars/{username}/{calendar_id}/
-            # The caldav library returns a URL object, convert to string and extract path
+            # Extract CalDAV-relative path from the calendar URL
             calendar_url = str(calendar.url)
-            # Extract path from full URL
             if calendar_url.startswith(self.base_url):
                 path = calendar_url[len(self.base_url) :]
             else:
-                # Fallback: construct path manually based on standard CalDAV structure
-                # CalDAV servers typically create calendars under /calendars/{principal}/
-                path = f"/calendars/{user.email}/{calendar_id}/"
+                path = f"/calendars/users/{user.email}/{calendar_id}/"
+
+            base_prefix = CalDAVHTTPClient.BASE_URI_PATH
+            if path.startswith(base_prefix):
+                path = path[len(base_prefix) :]
+                if not path.startswith("/"):
+                    path = "/" + path
+
+            path = unquote(path)
 
             logger.info(
-                "Created calendar in CalDAV server: %s at %s", calendar_name, path
+                "Created calendar in CalDAV server: %s at %s",
+                calendar_name,
+                path,
             )
             return path
         except Exception as e:
@@ -285,7 +342,7 @@ class CalDAVClient:
         client = self._get_client(user)
 
         # Get calendar by URL
-        calendar_url = f"{self.base_url}{calendar_path}"
+        calendar_url = self._calendar_url(calendar_path)
         calendar = client.calendar(url=calendar_url)
 
         try:
@@ -323,7 +380,7 @@ class CalDAVClient:
         Returns the event UID.
         """
         client = self._get_client(user)
-        calendar_url = f"{self.base_url}{calendar_path}"
+        calendar_url = self._calendar_url(calendar_path)
         calendar = client.calendar(url=calendar_url)
 
         try:
@@ -342,7 +399,7 @@ class CalDAVClient:
         """
 
         client = self._get_client(user)
-        calendar_url = f"{self.base_url}{calendar_path}"
+        calendar_url = self._calendar_url(calendar_path)
         calendar = client.calendar(url=calendar_url)
 
         # Extract event data
@@ -385,27 +442,11 @@ class CalDAVClient:
         """Update an existing event in CalDAV server."""
 
         client = self._get_client(user)
-        calendar_url = f"{self.base_url}{calendar_path}"
+        calendar_url = self._calendar_url(calendar_path)
         calendar = client.calendar(url=calendar_url)
 
         try:
-            # Search for the event by UID
-            events = calendar.search(event=True)
-            target_event = None
-
-            for event in events:
-                event_uid_value = None
-                if hasattr(event, "icalendar_component"):
-                    event_uid_value = str(event.icalendar_component.get("uid", ""))
-                elif hasattr(event, "vobject_instance"):
-                    event_uid_value = event.vobject_instance.vevent.uid.value
-
-                if event_uid_value == event_uid:
-                    target_event = event
-                    break
-
-            if not target_event:
-                raise ValueError(f"Event with UID {event_uid} not found")
+            target_event = calendar.object_by_uid(event_uid)
 
             # Update event properties
             dtstart = event_data.get("start")
@@ -432,6 +473,8 @@ class CalDAVClient:
             target_event.save()
 
             logger.info("Updated event in CalDAV server: %s", event_uid)
+        except NotFoundError:
+            raise ValueError(f"Event with UID {event_uid} not found") from None
         except Exception as e:
             logger.error("Failed to update event in CalDAV server: %s", str(e))
             raise
@@ -440,35 +483,43 @@ class CalDAVClient:
         """Delete an event from CalDAV server."""
 
         client = self._get_client(user)
-        calendar_url = f"{self.base_url}{calendar_path}"
+        calendar_url = self._calendar_url(calendar_path)
         calendar = client.calendar(url=calendar_url)
 
         try:
-            # Search for the event by UID
-            events = calendar.search(event=True)
-            target_event = None
-
-            for event in events:
-                event_uid_value = None
-                if hasattr(event, "icalendar_component"):
-                    event_uid_value = str(event.icalendar_component.get("uid", ""))
-                elif hasattr(event, "vobject_instance"):
-                    event_uid_value = event.vobject_instance.vevent.uid.value
-
-                if event_uid_value == event_uid:
-                    target_event = event
-                    break
-
-            if not target_event:
-                raise ValueError(f"Event with UID {event_uid} not found")
-
-            # Delete the event
+            target_event = calendar.object_by_uid(event_uid)
             target_event.delete()
-
             logger.info("Deleted event from CalDAV server: %s", event_uid)
+        except NotFoundError:
+            raise ValueError(f"Event with UID {event_uid} not found") from None
         except Exception as e:
             logger.error("Failed to delete event from CalDAV server: %s", str(e))
             raise
+
+    def get_user_calendar_paths(self, user) -> list[str]:
+        """Return a list of CalDAV-relative calendar paths for the user."""
+        client = self._get_client(user)
+        principal = client.principal()
+        paths = []
+        base = f"{self.base_url}{CalDAVHTTPClient.BASE_URI_PATH}"
+        for cal in principal.calendars():
+            url = str(cal.url)
+            if url.startswith(base):
+                paths.append(unquote(url[len(base) :]))
+        return paths
+
+    def create_default_calendar(self, user) -> str:
+        """Create a default calendar for a user. Returns the caldav_path."""
+        from core.services.translation_service import (  # noqa: PLC0415  # pylint: disable=import-outside-toplevel
+            TranslationService,
+        )
+
+        calendar_id = str(uuid4())
+        lang = TranslationService.resolve_language(email=user.email)
+        calendar_name = TranslationService.t("calendar.list.defaultCalendarName", lang)
+        return self.create_calendar(
+            user, calendar_name, calendar_id, color=settings.DEFAULT_CALENDAR_COLOR
+        )
 
     def _parse_event(self, event) -> Optional[dict]:
         """
@@ -491,13 +542,15 @@ class CalDAVClient:
             # Convert datetime to string format for consistency
             if event_data["start"]:
                 if isinstance(event_data["start"], datetime):
-                    event_data["start"] = event_data["start"].strftime("%Y%m%dT%H%M%SZ")
+                    utc_start = event_data["start"].astimezone(dt_timezone.utc)
+                    event_data["start"] = utc_start.strftime("%Y%m%dT%H%M%SZ")
                 elif isinstance(event_data["start"], date):
                     event_data["start"] = event_data["start"].strftime("%Y%m%d")
 
             if event_data["end"]:
                 if isinstance(event_data["end"], datetime):
-                    event_data["end"] = event_data["end"].strftime("%Y%m%dT%H%M%SZ")
+                    utc_end = event_data["end"].astimezone(dt_timezone.utc)
+                    event_data["end"] = utc_end.strftime("%Y%m%dT%H%M%SZ")
                 elif isinstance(event_data["end"], date):
                     event_data["end"] = event_data["end"].strftime("%Y%m%d")
 
@@ -507,60 +560,19 @@ class CalDAVClient:
             return None
 
 
-class CalendarService:
-    """
-    High-level service for managing calendars and events.
-    """
-
-    def __init__(self):
-        self.caldav = CalDAVClient()
-
-    def create_default_calendar(self, user) -> str:
-        """Create a default calendar for a user. Returns the caldav_path."""
-        from core.services.translation_service import (  # noqa: PLC0415  # pylint: disable=import-outside-toplevel
-            TranslationService,
-        )
-
-        calendar_id = str(uuid4())
-        lang = TranslationService.resolve_language(email=user.email)
-        calendar_name = TranslationService.t("calendar.list.defaultCalendarName", lang)
-        return self.caldav.create_calendar(
-            user, calendar_name, calendar_id, color=settings.DEFAULT_CALENDAR_COLOR
-        )
-
-    def create_calendar(self, user, name: str, color: str = "") -> str:
-        """Create a new calendar for a user. Returns the caldav_path."""
-        calendar_id = str(uuid4())
-        return self.caldav.create_calendar(
-            user, name, calendar_id, color=color or settings.DEFAULT_CALENDAR_COLOR
-        )
-
-    def get_events(self, user, caldav_path: str, start=None, end=None) -> list:
-        """Get events from a calendar. Returns parsed event data."""
-        return self.caldav.get_events(user, caldav_path, start, end)
-
-    def create_event(self, user, caldav_path: str, event_data: dict) -> str:
-        """Create a new event."""
-        return self.caldav.create_event(user, caldav_path, event_data)
-
-    def update_event(
-        self, user, caldav_path: str, event_uid: str, event_data: dict
-    ) -> None:
-        """Update an existing event."""
-        self.caldav.update_event(user, caldav_path, event_uid, event_data)
-
-    def delete_event(self, user, caldav_path: str, event_uid: str) -> None:
-        """Delete an event."""
-        self.caldav.delete_event(user, caldav_path, event_uid)
+# CalendarService is kept as an alias for backwards compatibility
+# with tests and signals that reference it.
+CalendarService = CalDAVClient
 
 
 # ---------------------------------------------------------------------------
 # CalDAV path utilities
 # ---------------------------------------------------------------------------
 
-# Pattern: /calendars/<email-or-encoded>/<calendar-id>/
+# Pattern: /calendars/users/<email-or-encoded>/<calendar-id>/
+# or /calendars/resources/<resource-id>/<calendar-id>/
 CALDAV_PATH_PATTERN = re.compile(
-    r"^/calendars/[^/]+/[a-zA-Z0-9-]+/$",
+    r"^/calendars/(users|resources)/[^/]+/[a-zA-Z0-9-]+/$",
 )
 
 
@@ -568,8 +580,8 @@ def normalize_caldav_path(caldav_path):
     """Normalize CalDAV path to consistent format.
 
     Strips the CalDAV API prefix (e.g. /api/v1.0/caldav/) if present,
-    so that paths like /api/v1.0/caldav/calendars/user@ex.com/uuid/
-    become /calendars/user@ex.com/uuid/.
+    so that paths like /api/v1.0/caldav/calendars/users/user@ex.com/uuid/
+    become /calendars/users/user@ex.com/uuid/.
     """
     if not caldav_path.startswith("/"):
         caldav_path = "/" + caldav_path
@@ -582,19 +594,60 @@ def normalize_caldav_path(caldav_path):
     return caldav_path
 
 
+def _resource_belongs_to_org(resource_id: str, org_id: str) -> bool:
+    """Check whether a resource principal belongs to the given organization.
+
+    Queries the CalDAV internal API. Returns False on any error (fail-closed).
+    """
+    api_key = settings.CALDAV_INTERNAL_API_KEY
+    caldav_url = settings.CALDAV_URL
+    if not api_key or not caldav_url:
+        return False
+    try:
+        resp = requests.get(
+            f"{caldav_url.rstrip('/')}/caldav/internal-api/resources/{resource_id}",
+            headers={"X-Internal-Api-Key": api_key},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return False
+        data = resp.json()
+        return data.get("org_id") == org_id
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.exception("Failed to verify resource org for %s", resource_id)
+        return False
+
+
 def verify_caldav_access(user, caldav_path):
     """Verify that the user has access to the CalDAV calendar.
 
     Checks that:
     1. The path matches the expected pattern (prevents path injection)
-    2. The user's email matches the email in the path
+    2. For user calendars: the user's email matches the email in the path
+    3. For resource calendars: the user has an organization
+
+    Note: Fine-grained org-to-resource authorization is enforced by SabreDAV
+    itself (via X-CalDAV-Organization header). This check only gates access
+    for Django-level features (subscription tokens, imports).
     """
     if not CALDAV_PATH_PATTERN.match(caldav_path):
         return False
     parts = caldav_path.strip("/").split("/")
-    if len(parts) >= 2 and parts[0] == "calendars":
-        path_email = unquote(parts[1])
+    if len(parts) < 3 or parts[0] != "calendars":
+        return False
+    # User calendars: calendars/users/<email>/<calendar-id>
+    if parts[1] == "users":
+        if not user.email:
+            return False
+        path_email = unquote(parts[2])
         return path_email.lower() == user.email.lower()
+    # Resource calendars: calendars/resources/<resource-id>/<calendar-id>
+    # Org membership is required. Fine-grained org-to-resource authorization
+    # is enforced by SabreDAV via the X-CalDAV-Organization header on every
+    # proxied request. For subscription tokens / imports, callers should
+    # additionally use _resource_belongs_to_org() to verify ownership.
+    if parts[1] == "resources":
+        return bool(getattr(user, "organization_id", None))
     return False
 
 
@@ -605,9 +658,15 @@ def validate_caldav_proxy_path(path):
     - Directory traversal sequences (../)
     - Null bytes
     - Paths that don't start with expected prefixes
+
+    URL-decodes the path first so that encoded payloads like
+    ``%2e%2e`` or ``%00`` cannot bypass the checks.
     """
     if not path:
         return True  # Empty path is fine (root request)
+
+    # Decode percent-encoded characters before validation
+    path = unquote(path)
 
     # Block directory traversal
     if ".." in path:
@@ -617,10 +676,60 @@ def validate_caldav_proxy_path(path):
     if "\x00" in path:
         return False
 
+    clean = path.lstrip("/")
+
+    # Explicitly block internal-api/ paths — these must never be proxied.
+    # The allowlist below already rejects them, but an explicit block makes
+    # the intent clear and survives future allowlist additions.
+    blocked_prefixes = ("internal-api/",)
+    if clean and any(clean.startswith(prefix) for prefix in blocked_prefixes):
+        return False
+
     # Path must start with a known CalDAV resource prefix
     allowed_prefixes = ("calendars/", "principals/", ".well-known/")
-    clean = path.lstrip("/")
     if clean and not any(clean.startswith(prefix) for prefix in allowed_prefixes):
         return False
 
     return True
+
+
+def cleanup_organization_caldav_data(org):
+    """Clean up CalDAV data for all members of an organization.
+
+    Deletes each member's CalDAV data via the SabreDAV internal API,
+    then deletes the Django User objects so the PROTECT foreign key
+    on User.organization doesn't block org deletion.
+
+    Called from Organization.delete() — NOT a signal, because the
+    PROTECT FK raises ProtectedError before pre_delete fires.
+    """
+    if not settings.CALDAV_INTERNAL_API_KEY:
+        return
+
+    http = CalDAVHTTPClient()
+    members = list(org.members.all())
+
+    for user in members:
+        if not user.email:
+            continue
+        try:
+            http.request(
+                "POST",
+                user,
+                "internal-api/users/delete",
+                data=json.dumps({"email": user.email}).encode("utf-8"),
+                content_type="application/json",
+                extra_headers={
+                    "X-Internal-Api-Key": settings.CALDAV_INTERNAL_API_KEY,
+                },
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.exception(
+                "Failed to clean up CalDAV data for user %s (org %s)",
+                user.email,
+                org.external_id,
+            )
+
+    # Delete all members so the PROTECT FK doesn't block org deletion.
+    # CalDAV cleanup is best-effort; orphaned CalDAV data is acceptable.
+    org.members.all().delete()

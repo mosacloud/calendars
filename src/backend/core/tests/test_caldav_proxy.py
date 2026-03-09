@@ -27,7 +27,7 @@ class TestCalDAVProxy:
     def test_proxy_requires_authentication(self):
         """Test that unauthenticated requests return 401."""
         client = APIClient()
-        response = client.generic("PROPFIND", "/api/v1.0/caldav/")
+        response = client.generic("PROPFIND", "/caldav/")
         assert response.status_code == HTTP_401_UNAUTHORIZED
 
     @responses.activate
@@ -49,7 +49,7 @@ class TestCalDAVProxy:
             )
         )
 
-        client.generic("PROPFIND", "/api/v1.0/caldav/")
+        client.generic("PROPFIND", "/caldav/")
 
         # Verify request was made to CalDAV server
         assert len(responses.calls) == 1
@@ -77,7 +77,7 @@ class TestCalDAVProxy:
         responses.add(
             responses.Response(
                 method="PROPFIND",
-                url=f"{caldav_url}/api/v1.0/caldav/",
+                url=f"{caldav_url}/caldav/",
                 status=HTTP_207_MULTI_STATUS,
                 body='<?xml version="1.0"?><multistatus xmlns="DAV:"></multistatus>',
                 headers={"Content-Type": "application/xml"},
@@ -88,7 +88,7 @@ class TestCalDAVProxy:
         malicious_email = "attacker@example.com"
         client.generic(
             "PROPFIND",
-            "/api/v1.0/caldav/",
+            "/caldav/",
             HTTP_X_FORWARDED_USER=malicious_email,
         )
 
@@ -107,10 +107,6 @@ class TestCalDAVProxy:
             "X-Forwarded-User should NOT use client-sent header value"
         )
 
-    @pytest.mark.skipif(
-        not settings.CALDAV_URL,
-        reason="CalDAV server URL not configured - integration test requires real server",
-    )
     def test_proxy_propfind_response_contains_prefixed_urls(self):
         """PROPFIND responses should contain URLs with proxy prefix.
 
@@ -130,7 +126,7 @@ class TestCalDAVProxy:
         )
         response = client.generic(
             "PROPFIND",
-            "/api/v1.0/caldav/",
+            "/caldav/",
             data=propfind_body,
             content_type="application/xml",
         )
@@ -154,8 +150,8 @@ class TestCalDAVProxy:
             if href and (
                 href.startswith("/principals/") or href.startswith("/calendars/")
             ):
-                assert href.startswith("/api/v1.0/caldav/"), (
-                    f"Expected URL to start with /api/v1.0/caldav/, "
+                assert href.startswith("/caldav/"), (
+                    f"Expected URL to start with /caldav/, "
                     f"got {href}. BaseUriPlugin is not using "
                     f"X-Forwarded-Prefix correctly. Full response: "
                     f"{response.content.decode('utf-8', errors='ignore')}"
@@ -178,7 +174,7 @@ class TestCalDAVProxy:
         propfind_xml = """<?xml version="1.0"?>
         <multistatus xmlns="DAV:">
             <response>
-                <href>/api/v1.0/caldav/calendars/test@example.com/calendar-id/</href>
+                <href>/caldav/calendars/users/test@example.com/calendar-id/</href>
                 <propstat>
                     <prop>
                         <resourcetype>
@@ -193,14 +189,14 @@ class TestCalDAVProxy:
         responses.add(
             responses.Response(
                 method="PROPFIND",
-                url=f"{caldav_url}/api/v1.0/caldav/",
+                url=f"{caldav_url}/caldav/",
                 status=HTTP_207_MULTI_STATUS,
                 body=propfind_xml,
                 headers={"Content-Type": "application/xml"},
             )
         )
 
-        response = client.generic("PROPFIND", "/api/v1.0/caldav/")
+        response = client.generic("PROPFIND", "/caldav/")
 
         assert response.status_code == HTTP_207_MULTI_STATUS
 
@@ -213,7 +209,7 @@ class TestCalDAVProxy:
 
         # Verify the URL is passed through unchanged (sabre/dav should generate it with prefix)
         href = href_elem.text
-        assert href == "/api/v1.0/caldav/calendars/test@example.com/calendar-id/", (
+        assert href == "/caldav/calendars/users/test@example.com/calendar-id/", (
             f"Expected URL to be passed through unchanged, got {href}"
         )
 
@@ -234,7 +230,7 @@ class TestCalDAVProxy:
         propfind_xml = """<?xml version="1.0"?>
         <multistatus xmlns="DAV:" xmlns:D="DAV:">
             <response>
-                <D:href>/api/v1.0/caldav/principals/test@example.com/</D:href>
+                <D:href>/caldav/principals/users/test@example.com/</D:href>
                 <propstat>
                     <prop>
                         <resourcetype>
@@ -248,14 +244,14 @@ class TestCalDAVProxy:
         responses.add(
             responses.Response(
                 method="PROPFIND",
-                url=f"{caldav_url}/api/v1.0/caldav/",
+                url=f"{caldav_url}/caldav/",
                 status=HTTP_207_MULTI_STATUS,
                 body=propfind_xml,
                 headers={"Content-Type": "application/xml"},
             )
         )
 
-        response = client.generic("PROPFIND", "/api/v1.0/caldav/")
+        response = client.generic("PROPFIND", "/caldav/")
 
         assert response.status_code == HTTP_207_MULTI_STATUS
 
@@ -268,7 +264,7 @@ class TestCalDAVProxy:
 
         # Verify the URL is passed through unchanged (sabre/dav should generate it with prefix)
         href = href_elem.text
-        assert href == "/api/v1.0/caldav/principals/test@example.com/", (
+        assert href == "/caldav/principals/users/test@example.com/", (
             f"Expected URL to be passed through unchanged, got {href}"
         )
 
@@ -283,7 +279,7 @@ class TestCalDAVProxy:
         responses.add(
             responses.Response(
                 method="PROPFIND",
-                url=f"{caldav_url}/api/v1.0/caldav/principals/test@example.com/",
+                url=f"{caldav_url}/caldav/principals/users/test@example.com/",
                 status=HTTP_207_MULTI_STATUS,
                 body='<?xml version="1.0"?><multistatus xmlns="DAV:"></multistatus>',
                 headers={"Content-Type": "application/xml"},
@@ -291,14 +287,12 @@ class TestCalDAVProxy:
         )
 
         # Request a specific path
-        client.generic("PROPFIND", "/api/v1.0/caldav/principals/test@example.com/")
+        client.generic("PROPFIND", "/caldav/principals/users/test@example.com/")
 
         # Verify the request was made to the correct URL
         assert len(responses.calls) == 1
         request = responses.calls[0].request
-        assert (
-            request.url == f"{caldav_url}/api/v1.0/caldav/principals/test@example.com/"
-        )
+        assert request.url == f"{caldav_url}/caldav/principals/users/test@example.com/"
 
     @responses.activate
     def test_proxy_handles_options_request(self):
@@ -307,7 +301,7 @@ class TestCalDAVProxy:
         client = APIClient()
         client.force_login(user)
 
-        response = client.options("/api/v1.0/caldav/")
+        response = client.options("/caldav/")
 
         assert response.status_code == HTTP_200_OK
         assert "Access-Control-Allow-Methods" in response
@@ -319,9 +313,7 @@ class TestCalDAVProxy:
         client = APIClient()
         client.force_login(user)
 
-        response = client.generic(
-            "PROPFIND", "/api/v1.0/caldav/calendars/../../etc/passwd"
-        )
+        response = client.generic("PROPFIND", "/caldav/calendars/../../etc/passwd")
         assert response.status_code == HTTP_400_BAD_REQUEST
 
     def test_proxy_rejects_non_caldav_path(self):
@@ -330,7 +322,16 @@ class TestCalDAVProxy:
         client = APIClient()
         client.force_login(user)
 
-        response = client.generic("PROPFIND", "/api/v1.0/caldav/etc/passwd")
+        response = client.generic("PROPFIND", "/caldav/etc/passwd")
+        assert response.status_code == HTTP_400_BAD_REQUEST
+
+    def test_proxy_rejects_internal_api_path(self):
+        """Test that proxy explicitly blocks /internal-api/ paths."""
+        user = factories.UserFactory(email="test@example.com")
+        client = APIClient()
+        client.force_login(user)
+
+        response = client.generic("POST", "/caldav/internal-api/resources/")
         assert response.status_code == HTTP_400_BAD_REQUEST
 
 
@@ -343,11 +344,11 @@ class TestValidateCaldavProxyPath:
 
     def test_calendars_path_is_valid(self):
         """Standard calendars path should be valid."""
-        assert validate_caldav_proxy_path("calendars/user@ex.com/uuid/") is True
+        assert validate_caldav_proxy_path("calendars/users/user@ex.com/uuid/") is True
 
     def test_principals_path_is_valid(self):
         """Standard principals path should be valid."""
-        assert validate_caldav_proxy_path("principals/user@ex.com/") is True
+        assert validate_caldav_proxy_path("principals/users/user@ex.com/") is True
 
     def test_traversal_is_rejected(self):
         """Directory traversal attempts should be rejected."""
@@ -363,4 +364,24 @@ class TestValidateCaldavProxyPath:
 
     def test_leading_slash_calendars_is_valid(self):
         """Paths with leading slash should still be valid."""
-        assert validate_caldav_proxy_path("/calendars/user@ex.com/uuid/") is True
+        assert validate_caldav_proxy_path("/calendars/users/user@ex.com/uuid/") is True
+
+    def test_internal_api_is_rejected(self):
+        """Internal API paths should be explicitly blocked."""
+        assert validate_caldav_proxy_path("internal-api/resources/") is False
+
+    def test_internal_api_with_leading_slash_is_rejected(self):
+        """Internal API paths with leading slash should be blocked."""
+        assert validate_caldav_proxy_path("/internal-api/import/user/cal") is False
+
+    def test_encoded_traversal_is_rejected(self):
+        """URL-encoded directory traversal should be rejected."""
+        assert validate_caldav_proxy_path("calendars/%2e%2e/%2e%2e/etc/passwd") is False
+
+    def test_encoded_internal_api_is_rejected(self):
+        """URL-encoded internal-api path should be blocked."""
+        assert validate_caldav_proxy_path("%69nternal-api/resources/") is False
+
+    def test_encoded_null_byte_is_rejected(self):
+        """URL-encoded null byte should be rejected."""
+        assert validate_caldav_proxy_path("calendars/user%00/") is False

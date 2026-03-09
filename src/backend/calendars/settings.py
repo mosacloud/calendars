@@ -14,8 +14,6 @@ import os
 import tomllib
 from socket import gethostbyname, gethostname
 
-from django.utils.translation import gettext_lazy as _
-
 import dj_database_url
 import sentry_sdk
 from configurations import Configuration, values
@@ -74,12 +72,23 @@ class Base(Configuration):
 
     # CalDAV API keys for bidirectional authentication
     # INBOUND: API key for authenticating requests FROM CalDAV server TO Django
-    CALDAV_INBOUND_API_KEY = values.Value(
+    CALDAV_INBOUND_API_KEY = SecretFileValue(
         None, environ_name="CALDAV_INBOUND_API_KEY", environ_prefix=None
     )
     # OUTBOUND: API key for authenticating requests FROM Django TO CalDAV server
-    CALDAV_OUTBOUND_API_KEY = values.Value(
+    CALDAV_OUTBOUND_API_KEY = SecretFileValue(
         None, environ_name="CALDAV_OUTBOUND_API_KEY", environ_prefix=None
+    )
+    # INTERNAL: API key for Django → CalDAV internal API (resource provisioning, import)
+    CALDAV_INTERNAL_API_KEY = SecretFileValue(
+        None, environ_name="CALDAV_INTERNAL_API_KEY", environ_prefix=None
+    )
+    # Salt for django-fernet-encrypted-fields (Channel tokens, etc.)
+    # Used with SECRET_KEY to derive Fernet encryption keys via PBKDF2
+    SALT_KEY = values.Value(
+        "calendars-default-salt-change-in-production",
+        environ_name="SALT_KEY",
+        environ_prefix=None,
     )
     # Base URL for CalDAV scheduling callbacks (must be accessible from CalDAV container)
     # In Docker environments, use the internal Docker network URL (e.g., http://backend:8000)
@@ -117,7 +126,7 @@ class Base(Configuration):
     CALENDAR_INVITATION_FROM_EMAIL = values.Value(
         None, environ_name="CALENDAR_INVITATION_FROM_EMAIL", environ_prefix=None
     )
-    APP_NAME = values.Value("Calendrier", environ_name="APP_NAME", environ_prefix=None)
+    APP_NAME = values.Value("Calendars", environ_name="APP_NAME", environ_prefix=None)
     APP_URL = values.Value("", environ_name="APP_URL", environ_prefix=None)
     CALENDAR_ITIP_ENABLED = values.BooleanValue(
         False, environ_name="CALENDAR_ITIP_ENABLED", environ_prefix=None
@@ -130,6 +139,18 @@ class Base(Configuration):
     DEFAULT_CALENDAR_COLOR = values.Value(
         "#3788d8",
         environ_name="DEFAULT_CALENDAR_COLOR",
+        environ_prefix=None,
+    )
+
+    # Organizations
+    OIDC_USERINFO_ORGANIZATION_CLAIM = values.Value(
+        "",
+        environ_name="OIDC_USERINFO_ORGANIZATION_CLAIM",
+        environ_prefix=None,
+    )
+    RESOURCE_EMAIL_DOMAIN = values.Value(
+        "",
+        environ_name="RESOURCE_EMAIL_DOMAIN",
         environ_prefix=None,
     )
 
@@ -212,7 +233,7 @@ class Base(Configuration):
     # This is used to limit the size of the request body in memory.
     # This also limits the size of the file that can be uploaded to the server.
     DATA_UPLOAD_MAX_MEMORY_SIZE = values.PositiveIntegerValue(
-        2 * (2**30),  # 2GB
+        20 * (2**20),  # 20MB
         environ_name="DATA_UPLOAD_MAX_MEMORY_SIZE",
         environ_prefix=None,
     )
@@ -234,14 +255,12 @@ class Base(Configuration):
     # fallback/default languages throughout the app.
     LANGUAGES = values.SingleNestedTupleValue(
         (
-            ("en-us", _("English")),
-            ("fr-fr", _("French")),
-            ("de-de", _("German")),
-            ("nl-nl", _("Dutch")),
+            ("en-us", "English"),
+            ("fr-fr", "French"),
+            ("de-de", "German"),
+            ("nl-nl", "Dutch"),
         )
     )
-
-    LOCALE_PATHS = (os.path.join(BASE_DIR, "locale"),)
 
     TIME_ZONE = "UTC"
     USE_I18N = True
@@ -275,7 +294,6 @@ class Base(Configuration):
         "django.middleware.security.SecurityMiddleware",
         "whitenoise.middleware.WhiteNoiseMiddleware",
         "django.contrib.sessions.middleware.SessionMiddleware",
-        "django.middleware.locale.LocaleMiddleware",
         "django.middleware.clickjacking.XFrameOptionsMiddleware",
         "corsheaders.middleware.CorsMiddleware",
         "django.middleware.common.CommonMiddleware",
@@ -296,7 +314,7 @@ class Base(Configuration):
         "drf_standardized_errors",
         # Third party apps
         "corsheaders",
-        "django_celery_beat",
+        "django_dramatiq",
         "django_filters",
         "rest_framework",
         "rest_framework_api_key",
@@ -415,7 +433,11 @@ class Base(Configuration):
     )
 
     AUTH_USER_MODEL = "core.User"
-    INVITATION_VALIDITY_DURATION = 604800  # 7 days, in seconds
+    RSVP_TOKEN_MAX_AGE_RECURRING = values.PositiveIntegerValue(
+        7776000,  # 90 days
+        environ_name="RSVP_TOKEN_MAX_AGE_RECURRING",
+        environ_prefix=None,
+    )
 
     # CORS
     CORS_ALLOW_CREDENTIALS = True
@@ -514,10 +536,40 @@ class Base(Configuration):
     THUMBNAIL_DEFAULT_STORAGE_ALIAS = "default"
     THUMBNAIL_ALIASES = {}
 
-    # Celery
-    CELERY_BROKER_URL = values.Value("redis://redis:6379/0")
-    CELERY_BROKER_TRANSPORT_OPTIONS = values.DictValue({})
-    CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+    # Dramatiq
+    DRAMATIQ_BROKER = {
+        "BROKER": "dramatiq.brokers.redis.RedisBroker",
+        "OPTIONS": {
+            "url": values.Value(
+                "redis://redis:6379/0",
+                environ_name="DRAMATIQ_BROKER_URL",
+                environ_prefix=None,
+            ),
+        },
+        "MIDDLEWARE": [
+            "dramatiq.middleware.AgeLimit",
+            "dramatiq.middleware.TimeLimit",
+            "dramatiq.middleware.Callbacks",
+            "dramatiq.middleware.Retries",
+            "dramatiq.middleware.CurrentMessage",
+            "django_dramatiq.middleware.DbConnectionsMiddleware",
+            "django_dramatiq.middleware.AdminMiddleware",
+        ],
+    }
+    DRAMATIQ_RESULT_BACKEND = {
+        "BACKEND": "dramatiq.results.backends.redis.RedisBackend",
+        "BACKEND_OPTIONS": {
+            "url": values.Value(
+                "redis://redis:6379/1",
+                environ_name="DRAMATIQ_RESULT_BACKEND_URL",
+                environ_prefix=None,
+            ),
+        },
+        "MIDDLEWARE_OPTIONS": {
+            "result_ttl": 1000 * 60 * 60 * 24 * 30,  # 30 days
+        },
+    }
+    DRAMATIQ_AUTODISCOVER_MODULES = ["tasks"]
 
     # Session
     SESSION_ENGINE = "django.contrib.sessions.backends.cache"
@@ -635,12 +687,6 @@ class Base(Configuration):
         environ_name="OIDC_USERINFO_FULLNAME_FIELDS",
         environ_prefix=None,
     )
-    OIDC_USERINFO_SHORTNAME_FIELD = values.Value(
-        default="first_name",
-        environ_name="OIDC_USERINFO_SHORTNAME_FIELD",
-        environ_prefix=None,
-    )
-
     # OIDC Resource Server
 
     OIDC_RESOURCE_SERVER_ENABLED = values.BooleanValue(
@@ -870,7 +916,7 @@ class Development(Base):
     ALLOWED_HOSTS = ["*"]
     CORS_ALLOW_ALL_ORIGINS = True
     CSRF_TRUSTED_ORIGINS = [
-        "http://localhost:8920",
+        "http://localhost:8930",
         "http://localhost:3000",
     ]
     DEBUG = True
@@ -887,8 +933,8 @@ class Development(Base):
     EMAIL_USE_SSL = False
     DEFAULT_FROM_EMAIL = "calendars@calendars.world"
     CALENDAR_INVITATION_FROM_EMAIL = "calendars@calendars.world"
-    APP_NAME = "Calendrier (Dev)"
-    APP_URL = "http://localhost:8921"
+    APP_NAME = "Calendars (dev)"
+    APP_URL = "http://localhost:8931"
 
     DEBUG_TOOLBAR_CONFIG = {
         "SHOW_TOOLBAR_CALLBACK": lambda request: True,
@@ -919,7 +965,18 @@ class Test(Base):
     ]
     USE_SWAGGER = True
 
-    CELERY_TASK_ALWAYS_EAGER = values.BooleanValue(True)
+    DRAMATIQ_BROKER = {
+        "BROKER": "core.task_utils.EagerBroker",
+        "OPTIONS": {},
+        "MIDDLEWARE": [
+            "dramatiq.middleware.CurrentMessage",
+        ],
+    }
+    DRAMATIQ_RESULT_BACKEND = {
+        "BACKEND": "dramatiq.results.backends.stub.StubBackend",
+        "BACKEND_OPTIONS": {},
+        "MIDDLEWARE_OPTIONS": {"result_ttl": 1000 * 60 * 10},
+    }
 
     OIDC_STORE_ACCESS_TOKEN = False
     OIDC_STORE_REFRESH_TOKEN = False
@@ -977,6 +1034,7 @@ class Production(Base):
         "^__lbheartbeat__",
         "^__heartbeat__",
         r"^api/v1\.0/caldav-scheduling-callback/",
+        r"^caldav/",
     ]
 
     # Modern browsers require to have the `secure` attribute on cookies with `Samesite=none`

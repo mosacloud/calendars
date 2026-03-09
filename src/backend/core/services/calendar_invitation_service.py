@@ -20,7 +20,7 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
-from django.core.signing import Signer
+from django.core.signing import TimestampSigner
 from django.template.loader import render_to_string
 
 from core.services.translation_service import TranslationService
@@ -424,8 +424,8 @@ class CalendarInvitationService:  # pylint: disable=too-many-instance-attributes
             "time_str": time_str,
             "is_update": event.sequence > 0,
             "is_cancel": method == self.METHOD_CANCEL,
-            "app_name": getattr(settings, "APP_NAME", "Calendrier"),
-            "app_url": getattr(settings, "APP_URL", ""),
+            "app_name": settings.APP_NAME,
+            "app_url": settings.APP_URL,
             # Translated content blocks
             "content": {
                 "title": t(f"email.{type_key}.title", lang),
@@ -457,13 +457,13 @@ class CalendarInvitationService:  # pylint: disable=too-many-instance-attributes
             "footer": t(
                 f"email.footer.{'invitation' if type_key == 'invitation' else 'notification'}",
                 lang,
-                appName=getattr(settings, "APP_NAME", "Calendrier"),
+                appName=settings.APP_NAME,
             ),
         }
 
         # Add RSVP links for REQUEST method (invitations and updates)
         if method == self.METHOD_REQUEST:
-            signer = Signer(salt="rsvp")
+            signer = TimestampSigner(salt="rsvp")
             # Strip mailto: prefix (case-insensitive) for shorter tokens
             organizer = re.sub(
                 r"^mailto:", "", event.organizer_email, flags=re.IGNORECASE
@@ -475,7 +475,7 @@ class CalendarInvitationService:  # pylint: disable=too-many-instance-attributes
                     "organizer": organizer,
                 }
             )
-            app_url = getattr(settings, "APP_URL", "")
+            app_url = settings.APP_URL
             base = f"{app_url}/rsvp/"
             for action in ("accept", "tentative", "decline"):
                 partstat = {
@@ -498,7 +498,7 @@ class CalendarInvitationService:  # pylint: disable=too-many-instance-attributes
         When False (default), strips METHOD so the ICS is treated as a plain
         calendar object — our own RSVP web links handle responses instead.
         """
-        itip_enabled = getattr(settings, "CALENDAR_ITIP_ENABLED", False)
+        itip_enabled = settings.CALENDAR_ITIP_ENABLED
 
         if itip_enabled:
             if "METHOD:" not in icalendar_data.upper():
@@ -549,10 +549,8 @@ class CalendarInvitationService:  # pylint: disable=too-many-instance-attributes
         """
         try:
             # Get email settings
-            from_addr = getattr(
-                settings,
-                "CALENDAR_INVITATION_FROM_EMAIL",
-                getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com"),
+            from_addr = (
+                settings.CALENDAR_INVITATION_FROM_EMAIL or settings.DEFAULT_FROM_EMAIL
             )
 
             # Create the email message
@@ -571,7 +569,7 @@ class CalendarInvitationService:  # pylint: disable=too-many-instance-attributes
             ics_attachment = MIMEBase("text", "calendar")
             ics_attachment.set_payload(ics_content.encode("utf-8"))
             encoders.encode_base64(ics_attachment)
-            itip_enabled = getattr(settings, "CALENDAR_ITIP_ENABLED", False)
+            itip_enabled = settings.CALENDAR_ITIP_ENABLED
             content_type = "text/calendar; charset=utf-8"
             if itip_enabled:
                 content_type += f"; method={ics_method}"

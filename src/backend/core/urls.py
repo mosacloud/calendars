@@ -8,19 +8,18 @@ from rest_framework.routers import DefaultRouter
 
 from core.api import viewsets
 from core.api.viewsets_caldav import CalDAVProxyView, CalDAVSchedulingCallbackView
+from core.api.viewsets_channels import ChannelViewSet
 from core.api.viewsets_ical import ICalExportView
-from core.api.viewsets_rsvp import RSVPView
+from core.api.viewsets_rsvp import RSVPConfirmView, RSVPProcessView
+from core.api.viewsets_task import TaskDetailView
 from core.external_api import viewsets as external_api_viewsets
 
 # - Main endpoints
 router = DefaultRouter()
 router.register("users", viewsets.UserViewSet, basename="users")
 router.register("calendars", viewsets.CalendarViewSet, basename="calendars")
-router.register(
-    "subscription-tokens",
-    viewsets.SubscriptionTokenViewSet,
-    basename="subscription-tokens",
-)
+router.register("resources", viewsets.ResourceViewSet, basename="resources")
+router.register("channels", ChannelViewSet, basename="channels")
 
 urlpatterns = [
     path(
@@ -29,35 +28,46 @@ urlpatterns = [
             [
                 *router.urls,
                 *oidc_urls,
-                # CalDAV proxy - root path (must come before catch-all to match /caldav exactly)
-                path("caldav", CalDAVProxyView.as_view(), name="caldav-root"),
-                path("caldav/", CalDAVProxyView.as_view(), name="caldav-root-slash"),
-                # CalDAV proxy - catch all paths with content
-                re_path(
-                    r"^caldav/(?P<path>.+)$",
-                    CalDAVProxyView.as_view(),
-                    name="caldav-proxy",
-                ),
-                # CalDAV scheduling callback endpoint (separate from caldav proxy)
+                # CalDAV scheduling callback endpoint
                 path(
                     "caldav-scheduling-callback/",
                     CalDAVSchedulingCallbackView.as_view(),
                     name="caldav-scheduling-callback",
                 ),
+                # RSVP POST endpoint (state-changing, with DRF throttling)
+                path(
+                    "rsvp/",
+                    RSVPProcessView.as_view(),
+                    name="rsvp-process",
+                ),
+                # Task status polling endpoint
+                path(
+                    "tasks/<str:task_id>/",
+                    TaskDetailView.as_view(),
+                    name="task-detail",
+                ),
             ]
         ),
     ),
     path(f"api/{settings.API_VERSION}/config/", viewsets.ConfigView.as_view()),
+    # CalDAV proxy - top-level stable path (not versioned)
+    path("caldav", CalDAVProxyView.as_view(), name="caldav-root"),
+    path("caldav/", CalDAVProxyView.as_view(), name="caldav-root-slash"),
+    re_path(
+        r"^caldav/(?P<path>.+)$",
+        CalDAVProxyView.as_view(),
+        name="caldav-proxy",
+    ),
     # Public iCal export endpoint (no authentication required)
-    # Token in URL acts as authentication
-    path(
-        "ical/<uuid:token>.ics",
+    # base64url channel ID for lookup, base64url token for auth, filename cosmetic
+    re_path(
+        r"^ical/(?P<short_id>[A-Za-z0-9_-]+)/(?P<token>[A-Za-z0-9_-]+)/[^/]+\.ics$",
         ICalExportView.as_view(),
         name="ical-export",
     ),
-    # RSVP endpoint (no authentication required)
+    # RSVP GET endpoint (renders auto-submitting confirmation page)
     # Signed token in query string acts as authentication
-    path("rsvp/", RSVPView.as_view(), name="rsvp"),
+    path("rsvp/", RSVPConfirmView.as_view(), name="rsvp"),
 ]
 
 

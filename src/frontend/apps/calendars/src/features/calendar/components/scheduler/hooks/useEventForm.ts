@@ -10,6 +10,7 @@ import type {
   IcsOrganizer,
 } from "ts-ics";
 import type { EventCalendarAdapter } from "../../../services/dav/EventCalendarAdapter";
+import type { ResourcePrincipal } from "@/features/resources/api/useResourcePrincipals";
 import type { AttachmentMeta, EventFormSectionId } from "../types";
 import { cleanEventForDisplay } from "../utils/eventDisplayRules";
 import {
@@ -27,6 +28,7 @@ interface UseEventFormParams {
   adapter: EventCalendarAdapter;
   organizer: IcsOrganizer | undefined;
   mode: "create" | "edit";
+  availableResources?: ResourcePrincipal[];
 }
 
 export const useEventForm = ({
@@ -35,6 +37,7 @@ export const useEventForm = ({
   adapter,
   organizer,
   mode,
+  availableResources = [],
 }: UseEventFormParams) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -46,6 +49,7 @@ export const useEventForm = ({
   const [selectedCalendarUrl, setSelectedCalendarUrl] = useState(calendarUrl);
   const [isAllDay, setIsAllDay] = useState(false);
   const [attendees, setAttendees] = useState<IcsAttendee[]>([]);
+  const [resources, setResources] = useState<ResourcePrincipal[]>([]);
   const [recurrence, setRecurrence] = useState<IcsRecurrenceRule | undefined>(
     undefined,
   );
@@ -79,13 +83,6 @@ export const useEventForm = ({
     setVideoConferenceUrl(cleaned.url);
     setAlarms(event?.alarms || []);
     setAttachments([]);
-
-    // Initialize attendees
-    if (event?.attendees && event.attendees.length > 0) {
-      setAttendees(event.attendees);
-    } else {
-      setAttendees([]);
-    }
 
     // Initialize recurrence
     if (event?.recurrenceRule) {
@@ -175,6 +172,42 @@ export const useEventForm = ({
     }
   }, [event, calendarUrl, mode, organizer?.email]);
 
+  // Separate effect for resource/attendee splitting — only depends on
+  // event.attendees and availableResources, avoids resetting the entire
+  // form when the resource list loads asynchronously.
+  useEffect(() => {
+    if (event?.attendees && event.attendees.length > 0) {
+      const resourceEmails = new Set(
+        availableResources
+          .filter((r) => r.email)
+          .map((r) => r.email!.toLowerCase()),
+      );
+      const peopleAttendees: IcsAttendee[] = [];
+      const matchedResources: ResourcePrincipal[] = [];
+
+      for (const att of event.attendees) {
+        const email = att.email.toLowerCase();
+        const resource = availableResources.find(
+          (r) => r.email && r.email.toLowerCase() === email,
+        );
+        if (resource && resourceEmails.has(email)) {
+          matchedResources.push(resource);
+        } else {
+          peopleAttendees.push(att);
+        }
+      }
+
+      setAttendees(peopleAttendees);
+      setResources(matchedResources);
+      if (matchedResources.length > 0) {
+        setExpandedSections((prev) => new Set([...prev, "resources"]));
+      }
+    } else {
+      setAttendees([]);
+      setResources([]);
+    }
+  }, [event?.attendees, availableResources]);
+
   const toggleSection = useCallback((sectionId: EventFormSectionId) => {
     setExpandedSections((prev) => {
       const next = new Set(prev);
@@ -249,6 +282,25 @@ export const useEventForm = ({
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { duration: _duration, ...eventWithoutDuration } = event ?? {};
 
+    // Merge resource attendees back into the attendees list
+    const resourceAttendees: IcsAttendee[] = resources
+      .filter((r) => r.email)
+      .map((r) => {
+        // Preserve partstat from the original event if available
+        const existing = event?.attendees?.find(
+          (a) => a.email.toLowerCase() === r.email!.toLowerCase(),
+        );
+        return {
+          email: r.email!,
+          name: r.name,
+          partstat: existing?.partstat ?? "NEEDS-ACTION",
+          rsvp: false,
+          role: "NON-PARTICIPANT" as const,
+          cutype: r.resourceType,
+        };
+      });
+    const allAttendees = [...attendees, ...resourceAttendees];
+
 
     if (isAllDay) {
       const startDate = parseDateLocal(startDateTime);
@@ -278,7 +330,7 @@ export const useEventForm = ({
         start: { date: utcStart, type: "DATE" },
         end: { date: utcEnd, type: "DATE" },
         organizer,
-        attendees: attendees.length > 0 ? attendees : undefined,
+        attendees: allAttendees.length > 0 ? allAttendees : undefined,
         recurrenceRule: recurrence,
         alarms: alarms.length > 0 ? alarms : undefined,
         url: videoConferenceUrl || undefined,
@@ -337,7 +389,7 @@ export const useEventForm = ({
         },
       },
       organizer,
-      attendees: attendees.length > 0 ? attendees : undefined,
+      attendees: allAttendees.length > 0 ? allAttendees : undefined,
       recurrenceRule: recurrence,
       alarms: alarms.length > 0 ? alarms : undefined,
       url: videoConferenceUrl || undefined,
@@ -355,6 +407,7 @@ export const useEventForm = ({
     location,
     organizer,
     attendees,
+    resources,
     recurrence,
     alarms,
     videoConferenceUrl,
@@ -382,6 +435,8 @@ export const useEventForm = ({
     // Complex fields
     attendees,
     setAttendees,
+    resources,
+    setResources,
     recurrence,
     setRecurrence,
     alarms,

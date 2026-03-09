@@ -3,6 +3,8 @@
 import logging
 from dataclasses import dataclass, field
 
+from django.conf import settings
+
 import requests
 
 from core.services.caldav_service import CalDAVHTTPClient
@@ -41,37 +43,43 @@ class ICSImportService:
     def import_events(self, user, caldav_path: str, ics_data: bytes) -> ImportResult:
         """Import events from ICS data into a calendar.
 
-        Sends the raw ICS bytes to SabreDAV's ?import endpoint which
-        handles all ICS parsing, splitting by UID, VALARM repair, and
-        per-event insertion.
+        Sends the raw ICS bytes to the SabreDAV internal API import
+        endpoint which handles all ICS parsing, splitting by UID,
+        VALARM repair, and per-event insertion.
 
         Args:
             user: The authenticated user performing the import.
             caldav_path: CalDAV path of the calendar
-                (e.g. /calendars/user@example.com/uuid/).
+                (e.g. /calendars/users/user@example.com/uuid/).
             ics_data: Raw ICS file content.
         """
         result = ImportResult()
 
-        try:
-            api_key = CalDAVHTTPClient.get_api_key()
-        except ValueError:
-            result.errors.append("CALDAV_OUTBOUND_API_KEY is not configured")
+        api_key = settings.CALDAV_INTERNAL_API_KEY
+        if not api_key:
+            result.errors.append("CALDAV_INTERNAL_API_KEY is not configured")
             return result
 
-        # Timeout scales with file size: 60s base + 30s per MB of ICS data.
-        # 8000 events (~4MB) took ~70s in practice.
-        timeout = 60 + int(len(ics_data) / 1024 / 1024) * 30
+        # Extract calendar URI from caldav_path
+        # Path format: /calendars/users/<email>/<calendar-uri>/
+        parts = caldav_path.strip("/").split("/")
+        if len(parts) == 4 and parts[0] == "calendars" and parts[1] == "users":
+            principal_user = parts[2]
+            calendar_uri = parts[3]
+        else:
+            result.errors.append("Invalid calendar path")
+            return result
 
+        # import runs in a background task so we can wait a decent amount of time
+        timeout = 1200  # 20 minutes
         try:
             response = self._http.request(
                 "POST",
-                user.email,
-                caldav_path,
-                query="import",
+                user,
+                f"internal-api/import/{principal_user}/{calendar_uri}",
                 data=ics_data,
                 content_type="text/calendar",
-                extra_headers={"X-Calendars-Import": api_key},
+                extra_headers={"X-Internal-Api-Key": api_key},
                 timeout=timeout,
             )
         except requests.RequestException as exc:

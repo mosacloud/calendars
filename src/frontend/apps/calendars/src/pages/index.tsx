@@ -4,8 +4,11 @@ import { useTranslation } from "next-i18next";
 import { Hero, Footer, MainLayout, HomeGutter } from "@gouvfr-lasuite/ui-kit";
 import { login, useAuth } from "@/features/auth/Auth";
 import { useEffect } from "react";
-import banner from "@/assets/home/banner.png";
-import { HeaderRight } from "@/features/layouts/components/header/Header";
+import banner from "@/assets/home/banner.svg";
+import {
+  HeaderIcon,
+  HeaderRight,
+} from "@/features/layouts/components/header/Header";
 import {
   addToast,
   Toaster,
@@ -16,7 +19,6 @@ import { useConfig } from "@/features/config/ConfigProvider";
 import { LeftPanelMobile } from "@/features/layouts/components/left-panel/LeftPanelMobile";
 import { SESSION_STORAGE_REDIRECT_AFTER_LOGIN_URL } from "@/features/api/fetchApi";
 import { useThemeCustomization } from "@/hooks/useThemeCustomization";
-import { Feedback } from "@/features/feedback/Feedback";
 import { DynamicCalendarLogo } from "@/features/ui/components/logo";
 export default function HomePage() {
   const { t } = useTranslation();
@@ -36,7 +38,16 @@ export default function HomePage() {
       );
       if (attemptedUrl) {
         sessionStorage.removeItem(SESSION_STORAGE_REDIRECT_AFTER_LOGIN_URL);
-        window.location.href = attemptedUrl;
+        try {
+          const url = new URL(attemptedUrl, window.location.origin);
+          if (url.origin === window.location.origin) {
+            window.location.href = url.href;
+          } else {
+            window.location.href = "/calendar";
+          }
+        } catch {
+          window.location.href = "/calendar";
+        }
       } else {
         // Redirect authenticated users to calendar page
         window.location.href = "/calendar";
@@ -112,12 +123,7 @@ HomePage.getLayout = function getLayout(page: React.ReactElement) {
           enableResize
           hideLeftPanelOnDesktop={true}
           leftPanelContent={<LeftPanelMobile />}
-          icon={
-            <div className="calendars__header__left">
-              <DynamicCalendarLogo variant="header" />
-              <Feedback />
-            </div>
-          }
+          icon={<HeaderIcon />}
           rightHeaderContent={<HeaderRight />}
         >
           {page}

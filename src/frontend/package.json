@@ -2,24 +2,16 @@
   "name": "main",
   "version": "0.10.1",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "engines": {
-    "node": ">=22.0.0 <25.0.0",
-    "yarn": "1.22.22"
+    "node": ">=24.0.0 <25.0.0"
   },
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "dev": "yarn workspace calendars run dev",
-    "build": "yarn workspace calendars run build",
-    "lint": "yarn workspace calendars run lint",
-    "build-theme": "yarn workspace calendars build-theme"
-  },
-  "resolutions": {},
-  "devDependencies": {
-    "@types/minimatch": "^6.0.0",
-    "turbo": "2.6.1"
-  },
-  "packageManager": "yarn@1.22.22"
+    "dev": "npm run dev -w calendars",
+    "build": "npm run build -w calendars",
+    "lint": "npm run lint -w calendars",
+    "build-theme": "npm run build-theme -w calendars"
+  }
 }

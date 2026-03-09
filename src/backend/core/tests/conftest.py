@@ -1,10 +1,9 @@
 """Fixtures for tests in the calendars core application"""
 
 import base64
-from unittest import mock
 
+from django.conf import settings
 from django.core.cache import cache
-from django.db import connection
 
 import pytest
 import responses
@@ -13,41 +12,84 @@ from core import factories
 from core.tests.utils.urls import reload_urls
 
 USER = "user"
-TEAM = "team"
-VIA = [USER, TEAM]
+
+
+def _has_caldav_marker(request):
+    """Check if the test has the xdist_group('caldav') marker."""
+    marker = request.node.get_closest_marker("xdist_group")
+    return marker is not None and marker.args and marker.args[0] == "caldav"
 
 
 @pytest.fixture(autouse=True)
-def truncate_caldav_tables(django_db_setup, django_db_blocker):  # pylint: disable=unused-argument
-    """Fixture to truncate CalDAV server tables at the start of each test.
+def truncate_caldav_tables(request, django_db_setup, django_db_blocker):  # pylint: disable=unused-argument
+    """Truncate CalDAV tables before each CalDAV E2E test.
 
-    CalDAV server tables are created by the CalDAV server container migrations, not Django.
-    We just truncate them to ensure clean state for each test.
+    Only runs for tests marked with @pytest.mark.xdist_group("caldav").
+    Non-CalDAV tests don't touch the SabreDAV database, so truncating
+    from their worker would corrupt state for CalDAV tests running
+    concurrently on another xdist worker.
     """
-    with django_db_blocker.unblock():
-        with connection.cursor() as cursor:
-            # Truncate CalDAV server tables if they exist (created by CalDAV server container)
-            cursor.execute("""
-                DO $$ 
-                BEGIN
-                    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'principals') THEN
-                        TRUNCATE TABLE principals CASCADE;
-                    END IF;
-                    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'users') THEN
-                        TRUNCATE TABLE users CASCADE;
-                    END IF;
-                    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'calendars') THEN
-                        TRUNCATE TABLE calendars CASCADE;
-                    END IF;
-                    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'calendarinstances') THEN
-                        TRUNCATE TABLE calendarinstances CASCADE;
-                    END IF;
-                    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'calendarobjects') THEN
-                        TRUNCATE TABLE calendarobjects CASCADE;
-                    END IF;
-                END $$;
-            """)
+    if not _has_caldav_marker(request):
+        yield
+        return
+
+    import psycopg  # noqa: PLC0415  # pylint: disable=import-outside-toplevel
+
+    db_settings = settings.DATABASES["default"]
+    conn = psycopg.connect(
+        host=db_settings["HOST"],
+        port=db_settings["PORT"],
+        dbname="calendars",  # SabreDAV always uses this DB
+        user=db_settings["USER"],
+        password=db_settings["PASSWORD"],
+    )
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:  # pylint: disable=no-member
+            for table in [
+                "calendarobjects",
+                "calendarinstances",
+                "calendars",
+                "principals",
+            ]:
+                cur.execute(f"TRUNCATE TABLE {table} CASCADE")
+    finally:
+        conn.close()  # pylint: disable=no-member
     yield
+
+
+@pytest.fixture(autouse=True)
+def disconnect_caldav_signals_for_unit_tests(request):
+    """Disconnect CalDAV signal handlers for non-CalDAV tests.
+
+    Prevents non-CalDAV tests from hitting the real SabreDAV server
+    (e.g. via post_save signal when UserFactory creates a user),
+    which would interfere with CalDAV E2E tests running concurrently
+    on another xdist worker.
+    """
+    if _has_caldav_marker(request):
+        yield
+        return
+
+    from django.contrib.auth import (  # noqa: PLC0415  # pylint: disable=import-outside-toplevel
+        get_user_model,
+    )
+    from django.db.models.signals import (  # noqa: PLC0415  # pylint: disable=import-outside-toplevel
+        post_save,
+        pre_delete,
+    )
+
+    from core.signals import (  # noqa: PLC0415  # pylint: disable=import-outside-toplevel
+        delete_user_caldav_data,
+        provision_default_calendar,
+    )
+
+    user_model = get_user_model()
+    post_save.disconnect(provision_default_calendar, sender=user_model)
+    pre_delete.disconnect(delete_user_caldav_data, sender=user_model)
+    yield
+    post_save.connect(provision_default_calendar, sender=user_model)
+    pre_delete.connect(delete_user_caldav_data, sender=user_model)
 
 
 @pytest.fixture(autouse=True)
@@ -58,16 +100,7 @@ def clear_cache():
     # Clear functools.cache for functions decorated with @functools.cache
 
 
-@pytest.fixture
-def mock_user_teams():
-    """Mock for the "teams" property on the User model."""
-    with mock.patch(
-        "core.models.User.teams", new_callable=mock.PropertyMock
-    ) as mock_teams:
-        yield mock_teams
-
-
-def resource_server_backend_setup(settings):
+def resource_server_backend_setup(settings):  # pylint: disable=redefined-outer-name
     """
     A fixture to create a user token for testing.
     """
@@ -91,7 +124,7 @@ def resource_server_backend_setup(settings):
 
 
 @pytest.fixture
-def resource_server_backend_conf(settings):
+def resource_server_backend_conf(settings):  # pylint: disable=redefined-outer-name
     """
     A fixture to create a user token for testing.
     """
@@ -100,7 +133,7 @@ def resource_server_backend_conf(settings):
 
 
 @pytest.fixture
-def resource_server_backend(settings):
+def resource_server_backend(settings):  # pylint: disable=redefined-outer-name
     """
     A fixture to create a user token for testing.
     Including a mocked introspection endpoint.

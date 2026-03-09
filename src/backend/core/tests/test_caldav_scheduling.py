@@ -72,13 +72,10 @@ def create_test_server() -> tuple:
 
 
 @pytest.mark.django_db
+@pytest.mark.xdist_group("caldav")
 class TestCalDAVScheduling:
     """Tests for CalDAV scheduling callback when creating events with attendees."""
 
-    @pytest.mark.skipif(
-        not settings.CALDAV_URL,
-        reason="CalDAV server URL not configured - integration test requires real server",
-    )
     def test_scheduling_callback_received_when_creating_event_with_attendee(  # noqa: PLR0915  # pylint: disable=too-many-locals,too-many-statements
         self,
     ):
@@ -125,8 +122,8 @@ class TestCalDAVScheduling:
 
         try:
             # Create an event with an attendee
-            client = service.caldav._get_client(organizer)  # pylint: disable=protected-access
-            calendar_url = f"{settings.CALDAV_URL}{caldav_path}"
+            client = service._get_client(organizer)  # pylint: disable=protected-access
+            calendar_url = service._calendar_url(caldav_path)  # pylint: disable=protected-access
 
             # Add custom callback URL header to the client
             # The CalDAV server will use this URL for the callback

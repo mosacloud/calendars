@@ -242,7 +242,10 @@ export const useSchedulerHandlers = ({
    * Handle modal save (create or update event).
    */
   const handleModalSave = useCallback(
-    async (event: IcsEvent, targetCalendarUrl: string) => {
+    async (
+      event: IcsEvent,
+      targetCalendarUrl: string,
+    ) => {
       if (modalState.mode === "create") {
         // Create new event
         const result = await caldavService.createEvent({
@@ -383,7 +386,7 @@ export const useSchedulerHandlers = ({
         }
       } else {
         // Option 3: Delete all occurrences OR non-recurring event
-        const result = await caldavService.deleteEvent(modalState.eventUrl);
+        const result = await caldavService.deleteEvent(modalState.eventUrl, modalState.etag);
 
         if (!result.success) {
           throw new Error(result.error || "Failed to delete event");

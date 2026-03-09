@@ -2,18 +2,11 @@
 
 import logging
 
-from django.core import exceptions
-
 from rest_framework import permissions
 
 from core.entitlements import EntitlementsUnavailableError, get_user_entitlements
 
 logger = logging.getLogger(__name__)
-
-ACTION_FOR_METHOD_TO_PERMISSION = {
-    "versions_detail": {"DELETE": "versions_destroy", "GET": "versions_retrieve"},
-    "children": {"GET": "children_list", "POST": "children_create"},
-}
 
 
 class IsAuthenticated(permissions.BasePermission):
@@ -24,15 +17,6 @@ class IsAuthenticated(permissions.BasePermission):
 
     def has_permission(self, request, view):
         return bool(request.auth) or request.user.is_authenticated
-
-
-class IsAuthenticatedOrSafe(IsAuthenticated):
-    """Allows access to authenticated users (or anonymous users but only on safe methods)."""
-
-    def has_permission(self, request, view):
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        return super().has_permission(request, view)
 
 
 class IsSelf(IsAuthenticated):
@@ -46,27 +30,7 @@ class IsSelf(IsAuthenticated):
         return obj == request.user
 
 
-class IsOwnedOrPublic(IsAuthenticated):
-    """
-    Allows access to authenticated users only for objects that are owned or not related
-    to any user via the "owner" field.
-    """
-
-    def has_object_permission(self, request, view, obj):
-        """Unsafe permissions are only allowed for the owner of the object."""
-        if obj.owner == request.user:
-            return True
-
-        if request.method in permissions.SAFE_METHODS and obj.owner is None:
-            return True
-
-        try:
-            return obj.user == request.user
-        except exceptions.ObjectDoesNotExist:
-            return False
-
-
-class IsEntitled(IsAuthenticated):
+class IsEntitledToAccess(IsAuthenticated):
     """Allows access only to users with can_access entitlement.
 
     Fail-closed: denies access when the entitlements service is
@@ -78,25 +42,31 @@ class IsEntitled(IsAuthenticated):
             return False
         try:
             entitlements = get_user_entitlements(request.user.sub, request.user.email)
-            return entitlements.get("can_access", True)
+            return entitlements.get("can_access", False)
         except EntitlementsUnavailableError:
+            logger.warning(
+                "Entitlements unavailable, denying access for user %s",
+                request.user.pk,
+            )
             return False
 
 
-class AccessPermission(permissions.BasePermission):
-    """Permission class for access objects."""
+class IsOrgAdmin(IsAuthenticated):
+    """Allows access only to users with can_admin entitlement.
+
+    Fail-closed: denies access when the entitlements service is
+    unavailable and no cached value exists.
+    """
 
     def has_permission(self, request, view):
-        return request.user.is_authenticated or view.action not in [
-            "create",
-        ]
-
-    def has_object_permission(self, request, view, obj):
-        """Check permission for a given object."""
-        abilities = obj.get_abilities(request.user)
-        action = view.action
+        if not super().has_permission(request, view):
+            return False
         try:
-            action = ACTION_FOR_METHOD_TO_PERMISSION[view.action][request.method]
-        except KeyError:
-            pass
-        return abilities.get(action, False)
+            entitlements = get_user_entitlements(request.user.sub, request.user.email)
+            return entitlements.get("can_admin", False)
+        except EntitlementsUnavailableError:
+            logger.warning(
+                "Entitlements unavailable, denying admin for user %s",
+                request.user.pk,
+            )
+            return False
