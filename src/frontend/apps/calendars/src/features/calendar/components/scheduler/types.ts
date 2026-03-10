@@ -83,7 +83,8 @@ export type EventFormSectionId =
   | "recurrence"
   | "attendees"
   | "resources"
-  | "videoConference";
+  | "videoConference"
+  | "scheduling";
 
 /**
  * Attachment metadata (UI only, no actual file upload).
@@ -130,7 +131,6 @@ export interface CalendarApi {
   addEvent: (event: unknown) => void;
   unselect: () => void;
   refetchEvents: () => void;
-  $destroy?: () => void;
 }
 
 /**
