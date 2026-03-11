@@ -131,6 +131,15 @@ export interface CalendarApi {
   addEvent: (event: unknown) => void;
   unselect: () => void;
   refetchEvents: () => void;
+  getEvents: () => Array<{
+    id: string | number;
+    title?: string | { html: string } | { domNodes: Node[] };
+    start: Date | string;
+    end?: Date | string;
+    allDay?: boolean;
+    backgroundColor?: string;
+    extendedProps?: Record<string, unknown>;
+  }>;
 }
 
 /**
@@ -141,4 +150,60 @@ export interface SchedulerToolbarProps {
   currentView: string;
   viewTitle: string;
   onViewChange?: (view: string) => void;
+}
+
+/**
+ * Mobile-specific view types.
+ */
+export type MobileView = "timeGridDay" | "timeGridTwoDays" | "listWeek";
+
+/**
+ * Props for the MobileToolbar component.
+ */
+export interface MobileToolbarProps {
+  calendarRef: React.RefObject<CalendarApi | null>;
+  currentView: string;
+  currentDate: Date;
+  onViewChange: (view: string) => void;
+  onWeekPrev: () => void;
+  onWeekNext: () => void;
+  onTodayClick: () => void;
+}
+
+/**
+ * Props for the WeekDayBar component.
+ */
+export interface WeekDayBarProps {
+  currentDate: Date;
+  currentView: string;
+  intlLocale: string;
+  weekDays: Date[];
+  onDayClick: (date: Date) => void;
+}
+
+/**
+ * Props for the FloatingActionButton component.
+ */
+export interface FloatingActionButtonProps {
+  onClick: () => void;
+}
+
+/**
+ * Props for the MobileListView component.
+ */
+export interface MobileListEvent {
+  id: string | number;
+  title: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+  backgroundColor: string;
+  extendedProps: Record<string, unknown>;
+}
+
+export interface MobileListViewProps {
+  weekDays: Date[];
+  events: MobileListEvent[];
+  intlLocale: string;
+  onEventClick: (eventId: string, extendedProps: Record<string, unknown>) => void;
 }
