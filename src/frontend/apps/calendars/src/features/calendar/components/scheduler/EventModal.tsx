@@ -24,6 +24,7 @@ import { InvitationResponseSection } from "./event-modal-sections/InvitationResp
 import { FreeBusySection } from "./event-modal-sections/FreeBusySection";
 import { SectionPills } from "./event-modal-sections/SectionPills";
 import { useResourcePrincipals } from "@/features/resources/api/useResourcePrincipals";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { EventModalProps, RecurringDeleteOption } from "./types";
 import { SectionRow } from "./event-modal-sections/SectionRow";
 
@@ -41,6 +42,7 @@ export const EventModal = ({
 }: EventModalProps) => {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -191,7 +193,7 @@ export const EventModal = ({
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        size={ModalSize.MEDIUM}
+        size={isMobile ? ModalSize.FULL : ModalSize.MEDIUM}
         title={
           mode === "create"
             ? t("calendar.event.createTitle")

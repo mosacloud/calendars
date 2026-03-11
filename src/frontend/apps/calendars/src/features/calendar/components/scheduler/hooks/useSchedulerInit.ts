@@ -33,12 +33,14 @@ interface UseSchedulerInitProps {
   adapter: EventCalendarAdapter;
   visibleCalendarUrlsRef: MutableRefObject<Set<string>>;
   davCalendarsRef: MutableRefObject<CalDavCalendar[]>;
+  initialView?: string;
   setCurrentDate: (info: { start: Date; end: Date }) => void;
   handleEventClick: (info: unknown) => void;
   handleEventDrop: (info: unknown) => void;
   handleEventResize: (info: unknown) => void;
   handleDateClick: (info: unknown) => void;
   handleSelect: (info: unknown) => void;
+  onEventsLoaded?: () => void;
 }
 
 // Helper to get current time as HH:MM string
@@ -56,12 +58,14 @@ export const useSchedulerInit = ({
   adapter,
   visibleCalendarUrlsRef,
   davCalendarsRef,
+  initialView = "timeGridWeek",
   setCurrentDate,
   handleEventClick,
   handleEventDrop,
   handleEventResize,
   handleDateClick,
   handleSelect,
+  onEventsLoaded,
 }: UseSchedulerInitProps) => {
   const { t, i18n } = useTranslation();
   const { calendarLocale, firstDayOfWeek, formatDayHeader } = useCalendarLocale();
@@ -78,6 +82,7 @@ export const useSchedulerInit = ({
     handleDateClick,
     handleSelect,
     setCurrentDate,
+    onEventsLoaded,
   });
 
   // Update refs when handlers change (no effect dependencies = no calendar recreation)
@@ -89,6 +94,7 @@ export const useSchedulerInit = ({
       handleDateClick,
       handleSelect,
       setCurrentDate,
+      onEventsLoaded,
     };
   });
 
@@ -100,9 +106,17 @@ export const useSchedulerInit = ({
       [TimeGrid, DayGrid, List, Interaction],
       {
         // View configuration
-        view: "timeGridWeek",
+        view: initialView,
         // Native toolbar disabled - using custom React toolbar (SchedulerToolbar)
         headerToolbar: false,
+
+        // Custom views
+        views: {
+          timeGridTwoDays: {
+            type: "timeGridDay",
+            duration: { days: 2 },
+          },
+        },
 
         // Locale & time settings
         locale: calendarLocale,
@@ -246,7 +260,12 @@ export const useSchedulerInit = ({
           },
         ],
 
-        // Loading state is handled internally by the calendar
+        // Notify when events finish loading (used by mobile list view)
+        loading: (isLoading: boolean) => {
+          if (!isLoading) {
+            handlersRef.current.onEventsLoaded?.();
+          }
+        },
       }
     );
 

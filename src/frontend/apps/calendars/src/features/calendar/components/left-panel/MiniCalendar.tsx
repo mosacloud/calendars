@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { useIsMobile } from "@/hooks/useIsMobile";
 import {
   addMonths,
   eachDayOfInterval,
@@ -21,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import { useCalendarContext } from "../../contexts";
 import { useCalendarLocale } from "../../hooks/useCalendarLocale";
 import { Button } from "@gouvfr-lasuite/cunningham-react";
+import { useLeftPanel } from "@/features/layouts/contexts/LeftPanelContext";
 
 interface MiniCalendarProps {
   selectedDate: Date;
@@ -42,6 +44,9 @@ export const MiniCalendar = ({
 }: MiniCalendarProps) => {
   const { t } = useTranslation();
   const { goToDate, currentDate } = useCalendarContext();
+  const leftPanel = useLeftPanel();
+  const isMobile = useIsMobile();
+
   const { dateFnsLocale, firstDayOfWeek } = useCalendarLocale();
   const [viewDate, setViewDate] = useState(selectedDate);
 
@@ -98,6 +103,9 @@ export const MiniCalendar = ({
   const handleDayClick = (day: Date) => {
     onDateSelect(day);
     goToDate(day);
+    if (isMobile) {
+      leftPanel.setIsLeftPanelOpen(false);
+    }
   };
 
   return (
