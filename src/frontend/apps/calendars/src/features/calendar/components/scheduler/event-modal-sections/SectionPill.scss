@@ -36,6 +36,16 @@
   }
 }
 
+@media (max-width: 768px) {
+  .section-pill {
+    padding: 0.5rem;
+
+    &__label {
+      display: none;
+    }
+  }
+}
+
 .section-pills {
   display: flex;
   flex-wrap: wrap;

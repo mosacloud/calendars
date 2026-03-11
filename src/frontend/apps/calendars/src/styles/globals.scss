@@ -22,6 +22,10 @@
 @use "./../features/calendar/components/scheduler/event-modal-sections/InvitationResponseSection";
 @use "./../features/calendar/components/scheduler/event-modal-sections/SectionPill";
 @use "./../features/calendar/components/scheduler/FreeBusyTimeline";
+@use "./../features/calendar/components/scheduler/mobile/WeekDayBar";
+@use "./../features/calendar/components/scheduler/mobile/MobileToolbar";
+@use "./../features/calendar/components/scheduler/mobile/FloatingActionButton";
+@use "./../features/calendar/components/scheduler/mobile/MobileListView";
 @use "./../features/resources/components/Resources";
 @use "./../features/settings/components/WorkingHoursSettings";
 @use "./../pages/index" as *;
@@ -101,6 +105,13 @@ body {
   top: -5px !important;
   width: 28px !important;
   height: 28px;
+}
+
+// Scoped to full-screen modals (mobile event modal uses FULL size)
+.c__modal--full .c__modal__close button {
+  @media (max-width: 768px) {
+    right: 0 !important;
+  }
 }
 
 .c__modal__scroller {

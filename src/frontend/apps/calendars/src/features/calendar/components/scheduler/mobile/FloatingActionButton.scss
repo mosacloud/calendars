@@ -1,0 +1,25 @@
+.fab-create-event {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  border: none;
+  background: var(--c--contextuals--background--semantic--brand--primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  -webkit-tap-highlight-color: transparent;
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  &__icon {
+    font-size: 24px;
+    color: var(--c--contextuals--content--semantic--neutral--on-neutral);
+  }
+}

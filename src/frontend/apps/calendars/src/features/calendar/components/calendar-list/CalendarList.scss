@@ -144,6 +144,10 @@
       opacity 0.15s,
       background-color 0.15s,
       color 0.15s;
+
+    @media (hover: none) {
+      opacity: 1;
+    }
   }
 
   &__menu {

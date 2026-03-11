@@ -131,7 +131,13 @@
           "listWeek": "Week list",
           "listMonth": "Month list",
           "listYear": "Year list",
-          "today": "Today"
+          "today": "Today",
+          "mobile": {
+            "oneDay": "One day",
+            "twoDays": "Two days",
+            "list": "List",
+            "noEvents": "No events"
+          }
         },
         "navigation": {
           "previous": "Previous",
@@ -982,7 +988,13 @@
           "listWeek": "Liste semaine",
           "listMonth": "Liste mois",
           "listYear": "Liste année",
-          "today": "Aujourd'hui"
+          "today": "Aujourd'hui",
+          "mobile": {
+            "oneDay": "Un jour",
+            "twoDays": "2 jours",
+            "list": "Liste",
+            "noEvents": "Aucun événement"
+          }
         },
         "navigation": {
           "previous": "Précédent",
@@ -1575,7 +1587,13 @@
           "listWeek": "Week lijst",
           "listMonth": "Maand lijst",
           "listYear": "Jaar lijst",
-          "today": "Vandaag"
+          "today": "Vandaag",
+          "mobile": {
+            "oneDay": "Een dag",
+            "twoDays": "Twee dagen",
+            "list": "Lijst",
+            "noEvents": "Geen evenementen"
+          }
         },
         "navigation": {
           "previous": "Vorige",

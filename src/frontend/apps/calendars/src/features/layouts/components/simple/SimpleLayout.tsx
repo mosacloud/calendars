@@ -3,6 +3,7 @@ import { GlobalLayout } from "../global/GlobalLayout";
 import { HeaderRight } from "../header/Header";
 import { Toaster } from "@/features/ui/components/toaster/Toaster";
 import { LeftPanelMobile } from "@/features/layouts/components/left-panel/LeftPanelMobile";
+import { useLeftPanel } from "../../contexts/LeftPanelContext";
 
 export const getSimpleLayout = (page: React.ReactElement) => {
   return <SimpleLayout>{page}</SimpleLayout>;
@@ -14,12 +15,15 @@ export const getSimpleLayout = (page: React.ReactElement) => {
  * Auth context to the children.
  */
 export const SimpleLayout = ({ children }: { children: React.ReactNode }) => {
+  const { isLeftPanelOpen, setIsLeftPanelOpen } = useLeftPanel();
   return (
     <div>
       <GlobalLayout>
         <MainLayout
           enableResize
           hideLeftPanelOnDesktop={true}
+          isLeftPanelOpen={isLeftPanelOpen}
+          setIsLeftPanelOpen={setIsLeftPanelOpen}
           leftPanelContent={<LeftPanelMobile />}
           rightHeaderContent={<HeaderRight />}
         >

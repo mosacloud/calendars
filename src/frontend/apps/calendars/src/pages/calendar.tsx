@@ -15,6 +15,7 @@ import {
   HeaderIcon,
   HeaderRight,
 } from "@/features/layouts/components/header/Header";
+import { useLeftPanel } from "@/features/layouts/contexts/LeftPanelContext";
 import { SpinnerPage } from "@/features/ui/components/spinner/SpinnerPage";
 import { Toaster } from "@/features/ui/components/toaster/Toaster";
 import { Scheduler } from "@/features/calendar/components/scheduler/Scheduler";
@@ -56,7 +57,9 @@ export default function CalendarPage() {
   );
 }
 
-CalendarPage.getLayout = function getLayout(page: React.ReactElement) {
+const CalendarLayout = ({ children }: { children: React.ReactNode }) => {
+  const { isLeftPanelOpen, setIsLeftPanelOpen } = useLeftPanel();
+
   return (
     <CalendarContextProvider>
       <div className="calendars__calendar">
@@ -66,11 +69,17 @@ CalendarPage.getLayout = function getLayout(page: React.ReactElement) {
             leftPanelContent={<LeftPanel />}
             icon={<HeaderIcon />}
             rightHeaderContent={<HeaderRight />}
+            isLeftPanelOpen={isLeftPanelOpen}
+            setIsLeftPanelOpen={setIsLeftPanelOpen}
           >
-            {page}
+            {children}
           </MainLayout>
         </GlobalLayout>
       </div>
     </CalendarContextProvider>
   );
+};
+
+CalendarPage.getLayout = function getLayout(page: React.ReactElement) {
+  return <CalendarLayout>{page}</CalendarLayout>;
 };
