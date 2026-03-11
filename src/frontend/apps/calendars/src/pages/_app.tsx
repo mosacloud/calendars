@@ -33,6 +33,7 @@ import {
 } from "@/features/ui/cunningham/useCunninghamTheme";
 import { FeedbackFooterMobile } from "@/features/feedback/Feedback";
 import { useDynamicFavicon } from "@/features/ui/hooks/useDynamicFavicon";
+import { LeftPanelProvider } from "@/features/layouts/contexts/LeftPanelContext";
 
 export type NextPageWithLayout<P = object, IP = P> = NextPage<P, IP> & {
   getLayout?: (page: ReactElement) => ReactNode;
@@ -134,8 +135,10 @@ const MyAppInner = ({ Component, pageProps }: AppPropsWithLayout) => {
           
             <ConfigProvider>
               <AnalyticsProvider>
-                {getLayout(<Component {...pageProps} />)}
-                <FeedbackFooterMobile />
+                <LeftPanelProvider>
+                  {getLayout(<Component {...pageProps} />)}
+                  <FeedbackFooterMobile />
+                </LeftPanelProvider>
               </AnalyticsProvider>
             </ConfigProvider>
           
