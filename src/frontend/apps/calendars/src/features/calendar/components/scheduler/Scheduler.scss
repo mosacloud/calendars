@@ -1,4 +1,15 @@
-#event-calendar {
+.scheduler {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.scheduler__calendar {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   padding-right: 12px;
 }
 
@@ -209,4 +220,10 @@
       font-weight: 500;
     }
   }
+}
+
+.ec-col-head {
+  background-color: var(
+    --c--contextuals--background--surface--secondary
+  ) !important;
 }

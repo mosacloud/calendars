@@ -259,3 +259,12 @@
     border-right: 1px solid var(--ec-border-color);
   }
 }
+
+// -----------------------------------------------------------------------------
+// 9. Mobile adjustments - Hide native day headers (WeekDayBar replaces them)
+// -----------------------------------------------------------------------------
+@media (max-width: 768px) {
+  .ec-header {
+    display: none !important;
+  }
+}

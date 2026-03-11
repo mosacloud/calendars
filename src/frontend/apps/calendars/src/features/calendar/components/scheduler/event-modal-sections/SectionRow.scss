@@ -101,6 +101,12 @@
   }
 }
 
+@media (max-width: 768px) {
+  .section-row__content {
+    padding-left: 0.5rem;
+  }
+}
+
 @keyframes sectionSlideDown {
   from {
     opacity: 0;
