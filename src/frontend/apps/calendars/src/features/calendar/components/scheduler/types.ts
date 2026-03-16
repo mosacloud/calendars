@@ -20,6 +20,11 @@ import type { EventCalendarAdapter } from "../../services/dav/EventCalendarAdapt
 export type RecurringDeleteOption = 'this' | 'future' | 'all';
 
 /**
+ * Options for editing recurring events.
+ */
+export type RecurringEditOption = 'this' | 'future' | 'all';
+
+/**
  * Props for the EventModal component.
  */
 export interface EventModalProps {
@@ -32,6 +37,7 @@ export interface EventModalProps {
   onSave: (
     event: IcsEvent,
     calendarUrl: string,
+    option?: RecurringEditOption,
   ) => Promise<void>;
   onDelete?: (
     event: IcsEvent,
@@ -52,6 +58,15 @@ export interface DeleteEventModalProps {
   isOpen: boolean;
   isRecurring: boolean;
   onConfirm: (option?: RecurringDeleteOption) => void;
+  onCancel: () => void;
+}
+
+/**
+ * Props for the RecurringEditModal component.
+ */
+export interface RecurringEditModalProps {
+  isOpen: boolean;
+  onConfirm: (option: RecurringEditOption) => void;
   onCancel: () => void;
 }
 
