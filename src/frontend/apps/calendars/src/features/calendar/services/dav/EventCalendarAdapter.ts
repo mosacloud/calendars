@@ -153,10 +153,30 @@ export class EventCalendarAdapter {
         }
       }
 
+      // Build a set of occurrence dates that have overrides (RECURRENCE-ID),
+      // so we can skip duplicate expanded instances for the same date.
+      const overriddenDates = new Set<string>()
+      for (const icsEvent of icsEvents) {
+        if (icsEvent.recurrenceId) {
+          const key = `${icsEvent.uid}_${icsEvent.recurrenceId.value.date.getTime()}`
+          overriddenDates.add(key)
+        }
+      }
+
       for (const icsEvent of icsEvents) {
         // Skip recurring source events if we only want instances
         if (icsEvent.recurrenceRule && !icsEvent.recurrenceId && !opts.includeRecurringInstances) {
           continue
+        }
+
+        // Skip expanded instances when an override exists for the same occurrence date.
+        // This prevents duplicates when CalDAV returns both the expanded original and
+        // the override VEVENT for the same occurrence.
+        if (!icsEvent.recurrenceId && sourceEventRules.has(icsEvent.uid)) {
+          const key = `${icsEvent.uid}_${icsEvent.start.date.getTime()}`
+          if (overriddenDates.has(key)) {
+            continue
+          }
         }
 
         // If this is a recurring instance without recurrenceRule, copy it from source
