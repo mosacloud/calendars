@@ -54,6 +54,7 @@ import type {
   SchedulingResponse,
   CalDavAttendee,
 } from './types/caldav-service'
+
 import {
   buildProppatchXml,
   buildShareRequestXml,
@@ -337,6 +338,57 @@ export class CalDavService {
   }
 
   /**
+   * Check if excluding an occurrence would leave zero valid occurrences.
+   *
+   * This happens when a recurring series has been truncated to a single
+   * occurrence (e.g. UNTIL = DTSTART) and we try to EXDATE that one
+   * remaining occurrence. SabreDAV rejects such ICS with a 500.
+   */
+  private isLastOccurrence(
+    sourceEvent: IcsEvent,
+    exdateDate: Date,
+  ): boolean {
+    const rule = sourceEvent.recurrenceRule
+    if (!rule) return false
+
+    // Unbounded series (no UNTIL and no COUNT) always have more occurrences
+    if (!rule.until && !rule.count) return false
+
+    // COUNT=1 means only one occurrence — if we exclude it, zero remain
+    if (rule.count === 1) return true
+
+    const dtstart =
+      sourceEvent.start.local?.date ?? sourceEvent.start.date
+
+    // If the exdate doesn't match DTSTART, there are other occurrences
+    const exdateMs = exdateDate.getTime()
+    const dtstartMs = dtstart.getTime()
+    if (exdateMs !== dtstartMs) return false
+
+    // DTSTART matches the exdate — check if UNTIL allows a second occurrence
+    if (rule.until) {
+      const untilDate = rule.until.local?.date ?? rule.until.date
+      const interval = rule.interval ?? 1
+      const MS_PER_DAY = 86_400_000
+
+      const intervalMs: Record<string, number> = {
+        SECONDLY: 1000 * interval,
+        MINUTELY: 60_000 * interval,
+        HOURLY: 3_600_000 * interval,
+        DAILY: MS_PER_DAY * interval,
+        WEEKLY: 7 * MS_PER_DAY * interval,
+        MONTHLY: 31 * MS_PER_DAY * interval,
+        YEARLY: 366 * MS_PER_DAY * interval,
+      }
+
+      const step = intervalMs[rule.frequency] ?? MS_PER_DAY
+      if (untilDate.getTime() < dtstartMs + step) return true
+    }
+
+    return false
+  }
+
+  /**
    * Add EXDATE to a recurring event to exclude specific occurrences.
    *
    * Uses ts-ics to parse and regenerate the ICS, ensuring correct
@@ -346,7 +398,7 @@ export class CalDavService {
     eventUrl: string,
     exdateToAdd: Date,
     etag?: string
-  ): Promise<CalDavResponse<{ etag?: string }>> {
+  ): Promise<CalDavResponse<{ etag?: string; shouldDeleteEntireEvent?: boolean }>> {
     return withErrorHandling(async () => {
       // Fetch the raw ICS file
       const fetchResponse = await fetch(eventUrl, {
@@ -366,20 +418,42 @@ export class CalDavService {
 
       // Parse ICS into structured object
       const calendar = convertIcsCalendar(undefined, icsText)
-      const event = calendar.events?.[0]
+      // Find the source event (with RRULE, without RECURRENCE-ID)
+      // to add the EXDATE to. Don't blindly use events[0] as it might
+      // be an override VEVENT when the ICS contains multiple VEVENTs.
+      const event = calendar.events?.find(
+        (e) => !e.recurrenceId,
+      ) ?? calendar.events?.[0]
       if (!event) {
         throw new Error('No event found in ICS data')
       }
 
+      // If this EXDATE would leave zero valid occurrences, signal the
+      // caller to delete the entire event instead (SabreDAV rejects
+      // RRULE + EXDATE combinations that produce zero occurrences).
+      if (this.isLastOccurrence(event, exdateToAdd)) {
+        return { shouldDeleteEntireEvent: true }
+      }
+
       // Build EXDATE entry matching DTSTART format (DATE vs DATE-TIME, timezone)
-      const newExdate: IcsDateObject = {
-        date: exdateToAdd,
-        type: event.start.type,
-        local: event.start.local ? {
-          date: exdateToAdd,
+      // exdateToAdd is already in "fake UTC" format (UTC components = local timezone
+      // time), since it comes from adapter.toIcsEvent() which creates fake UTC dates.
+      // Use it directly with the source event's timezone info.
+      const exdateFakeUtc = exdateToAdd
+      let exdateLocal: { date: Date; timezone: string; tzoffset: string } | undefined
+
+      if (event.start.local) {
+        exdateLocal = {
+          date: exdateFakeUtc,
           timezone: event.start.local.timezone,
           tzoffset: event.start.local.tzoffset,
-        } : undefined,
+        }
+      }
+
+      const newExdate: IcsDateObject = {
+        date: exdateFakeUtc,
+        type: event.start.type,
+        local: exdateLocal,
       }
 
       // Append to existing exception dates
@@ -409,6 +483,340 @@ export class CalDavService {
 
       return { etag: newEtag }
     }, 'Failed to add EXDATE to event')
+  }
+
+  /**
+   * Delete an override instance from a recurring event.
+   *
+   * Removes the override VEVENT (identified by RECURRENCE-ID) from the ICS
+   * and ensures the EXDATE for that occurrence exists on the source event,
+   * so SabreDAV won't return the original occurrence either.
+   */
+  async deleteOverrideInstance(
+    eventUrl: string,
+    occurrenceDate: Date,
+    uid: string,
+    etag?: string,
+  ): Promise<CalDavResponse<{ etag?: string; shouldDeleteEntireEvent?: boolean }>> {
+    return withErrorHandling(async () => {
+      // Fetch the raw ICS
+      const fetchResponse = await fetch(eventUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'text/calendar',
+          ...this._account?.headers,
+        },
+        ...this._account?.fetchOptions,
+      })
+
+      if (!fetchResponse.ok) {
+        throw new Error(`Failed to fetch event: ${fetchResponse.status}`)
+      }
+
+      const icsText = await fetchResponse.text()
+      const calendar = convertIcsCalendar(undefined, icsText)
+
+      const sourceEvent = calendar.events?.find(
+        (e) => e.uid === uid && !e.recurrenceId,
+      )
+      if (!sourceEvent) {
+        throw new Error('Source event not found in ICS data')
+      }
+
+      // If adding EXDATE would leave zero occurrences, signal caller to
+      // delete the entire event instead (SabreDAV rejects empty series).
+      if (this.isLastOccurrence(sourceEvent, occurrenceDate)) {
+        return { shouldDeleteEntireEvent: true }
+      }
+
+      // occurrenceDate is in fake UTC format. Find and remove the override VEVENT
+      // by comparing against both real UTC and fake UTC (local.date) recurrenceId.
+      const occurrenceFakeUtc = occurrenceDate
+      calendar.events = calendar.events?.filter(
+        (e) => {
+          if (e.uid !== uid || !e.recurrenceId) return true
+          return !(
+            e.recurrenceId.value.date.getTime() === occurrenceFakeUtc.getTime() ||
+            e.recurrenceId.value.local?.date.getTime() === occurrenceFakeUtc.getTime()
+          )
+        },
+      )
+
+      // Ensure EXDATE exists on the source event for this occurrence
+      const exdateAlreadyExists = sourceEvent.exceptionDates?.some(
+        (exd) =>
+          exd.date.getTime() === occurrenceFakeUtc.getTime() ||
+          exd.local?.date.getTime() === occurrenceFakeUtc.getTime(),
+      )
+
+      if (!exdateAlreadyExists) {
+        let occurrenceLocal: { date: Date; timezone: string; tzoffset: string } | undefined
+        if (sourceEvent.start.local) {
+          occurrenceLocal = {
+            date: occurrenceFakeUtc,
+            timezone: sourceEvent.start.local.timezone,
+            tzoffset: sourceEvent.start.local.tzoffset,
+          }
+        }
+
+        const newExdate: IcsDateObject = {
+          date: occurrenceFakeUtc,
+          type: sourceEvent.start.type,
+          local: occurrenceLocal,
+        }
+        sourceEvent.exceptionDates = [
+          ...(sourceEvent.exceptionDates ?? []),
+          newExdate,
+        ]
+      }
+
+      this.validateTimezones(calendar)
+      const updatedIcsText = generateIcsCalendar(calendar)
+
+      // PUT the updated ICS
+      const updateResponse = await fetch(eventUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'text/calendar; charset=utf-8',
+          ...(etag ? { 'If-Match': etag } : {}),
+          ...this._account?.headers,
+        },
+        body: updatedIcsText,
+        ...this._account?.fetchOptions,
+      })
+
+      if (!updateResponse.ok) {
+        throw new Error(`Failed to update event: ${updateResponse.status}`)
+      }
+
+      const newEtag = updateResponse.headers.get('ETag') || undefined
+      return { etag: newEtag }
+    }, 'Failed to delete override instance')
+  }
+
+  /**
+   * Truncate a recurring series at a given cutoff date.
+   *
+   * Sets RRULE UNTIL to the day before cutoffDate, removes override VEVENTs
+   * with recurrenceId >= cutoffDate, and removes EXDATE entries >= cutoffDate.
+   */
+  async truncateRecurringSeries(
+    eventUrl: string,
+    cutoffDate: Date,
+    uid: string,
+    etag?: string,
+  ): Promise<CalDavResponse<{ etag?: string }>> {
+    return withErrorHandling(async () => {
+      // Fetch the raw ICS
+      const fetchResponse = await fetch(eventUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'text/calendar',
+          ...this._account?.headers,
+        },
+        ...this._account?.fetchOptions,
+      })
+
+      if (!fetchResponse.ok) {
+        throw new Error(`Failed to fetch event: ${fetchResponse.status}`)
+      }
+
+      const icsText = await fetchResponse.text()
+      const calendar = convertIcsCalendar(undefined, icsText)
+
+      const sourceEvent = calendar.events?.find(
+        (e) => e.uid === uid && !e.recurrenceId,
+      )
+      if (!sourceEvent) {
+        throw new Error('Source event not found in ICS data')
+      }
+
+      if (!sourceEvent.recurrenceRule) {
+        throw new Error('Source event has no recurrence rule')
+      }
+
+      // Set RRULE UNTIL to day before cutoff
+      const untilDate = new Date(cutoffDate)
+      untilDate.setDate(untilDate.getDate() - 1)
+      untilDate.setHours(23, 59, 59, 999)
+
+      sourceEvent.recurrenceRule = {
+        ...sourceEvent.recurrenceRule,
+        until: { type: 'DATE-TIME' as const, date: untilDate },
+        count: undefined,
+      }
+
+      // Remove override VEVENTs with recurrenceId >= cutoffDate
+      const cutoffMs = cutoffDate.getTime()
+      calendar.events = calendar.events?.filter((e) => {
+        if (e.uid !== uid || !e.recurrenceId) return true
+        return !(
+          e.recurrenceId.value.date.getTime() >= cutoffMs ||
+          (e.recurrenceId.value.local?.date.getTime() ?? -1) >= cutoffMs
+        )
+      })
+
+      // Remove EXDATE entries >= cutoffDate from source event
+      if (sourceEvent.exceptionDates?.length) {
+        sourceEvent.exceptionDates = sourceEvent.exceptionDates.filter(
+          (exd) => {
+            return !(
+              exd.date.getTime() >= cutoffMs ||
+              (exd.local?.date.getTime() ?? -1) >= cutoffMs
+            )
+          },
+        )
+      }
+
+      this.validateTimezones(calendar)
+      const updatedIcsText = generateIcsCalendar(calendar)
+
+      // PUT the updated ICS
+      const updateResponse = await fetch(eventUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'text/calendar; charset=utf-8',
+          ...(etag ? { 'If-Match': etag } : {}),
+          ...this._account?.headers,
+        },
+        body: updatedIcsText,
+        ...this._account?.fetchOptions,
+      })
+
+      if (!updateResponse.ok) {
+        throw new Error(`Failed to update event: ${updateResponse.status}`)
+      }
+
+      const newEtag = updateResponse.headers.get('ETag') || undefined
+      return { etag: newEtag }
+    }, 'Failed to truncate recurring series')
+  }
+
+  /**
+   * Create an override instance for a recurring event.
+   *
+   * This adds the modified occurrence as a new VEVENT with RECURRENCE-ID
+   * inside the same ICS resource, and adds an EXDATE to the parent event
+   * to exclude the original occurrence.
+   */
+  async createOverrideInstance(
+    eventUrl: string,
+    overrideEvent: IcsEvent,
+    occurrenceDate: Date,
+    etag?: string,
+  ): Promise<CalDavResponse<{ etag?: string }>> {
+    return withErrorHandling(async () => {
+      // Fetch the raw ICS
+      const fetchResponse = await fetch(eventUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'text/calendar',
+          ...this._account?.headers,
+        },
+        ...this._account?.fetchOptions,
+      })
+
+      if (!fetchResponse.ok) {
+        throw new Error(`Failed to fetch event: ${fetchResponse.status}`)
+      }
+
+      const icsText = await fetchResponse.text()
+      const calendar = convertIcsCalendar(undefined, icsText)
+      const sourceEvent = calendar.events?.find(
+        (e) => e.uid === overrideEvent.uid && !e.recurrenceId,
+      )
+
+      if (!sourceEvent) {
+        throw new Error('Source event not found in ICS data')
+      }
+
+      // occurrenceDate is already in "fake UTC" format (UTC components = local timezone
+      // time), since it comes from adapter.toIcsEvent() which creates fake UTC dates.
+      // Use it directly with the source event's timezone info.
+      const occurrenceFakeUtc = occurrenceDate
+      let occurrenceLocal: { date: Date; timezone: string; tzoffset: string } | undefined
+
+      if (sourceEvent.start.local) {
+        occurrenceLocal = {
+          date: occurrenceFakeUtc,
+          timezone: sourceEvent.start.local.timezone,
+          tzoffset: sourceEvent.start.local.tzoffset,
+        }
+      }
+
+      // Check if an override for this occurrence already exists (re-drag case)
+      // occurrenceFakeUtc is in fake UTC format. Compare against both:
+      // - recurrenceId.value.date (real UTC from ts-ics parsing)
+      // - recurrenceId.value.local?.date (fake UTC if TZID was present)
+      const existingOverrideIdx =
+        calendar.events?.findIndex(
+          (e) =>
+            e.uid === overrideEvent.uid &&
+            e.recurrenceId &&
+            (e.recurrenceId.value.date.getTime() === occurrenceFakeUtc.getTime() ||
+             e.recurrenceId.value.local?.date.getTime() === occurrenceFakeUtc.getTime()),
+        ) ?? -1
+
+      if (existingOverrideIdx >= 0) {
+        // Re-drag: update existing override in-place, EXDATE already exists
+        const existingOverride = calendar.events![existingOverrideIdx]
+        calendar.events![existingOverrideIdx] = {
+          ...overrideEvent,
+          recurrenceRule: undefined,
+          recurrenceId: existingOverride.recurrenceId,
+          sequence: (existingOverride.sequence ?? 0) + 1,
+        }
+      } else {
+        // First override: add EXDATE + new override VEVENT
+        const newExdate: IcsDateObject = {
+          date: occurrenceFakeUtc,
+          type: sourceEvent.start.type,
+          local: occurrenceLocal,
+        }
+
+        sourceEvent.exceptionDates = [
+          ...(sourceEvent.exceptionDates ?? []),
+          newExdate,
+        ]
+
+        const overrideVevent: IcsEvent = {
+          ...overrideEvent,
+          recurrenceRule: undefined,
+          recurrenceId: {
+            value: {
+              date: occurrenceFakeUtc,
+              type: sourceEvent.start.type,
+              local: occurrenceLocal,
+            },
+          },
+          sequence: (overrideEvent.sequence ?? 0) + 1,
+        }
+
+        calendar.events = [...(calendar.events ?? []), overrideVevent]
+      }
+
+      this.validateTimezones(calendar)
+      const updatedIcsText = generateIcsCalendar(calendar)
+
+      // PUT the updated ICS
+      const updateResponse = await fetch(eventUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'text/calendar; charset=utf-8',
+          ...(etag ? { 'If-Match': etag } : {}),
+          ...this._account?.headers,
+        },
+        body: updatedIcsText,
+        ...this._account?.fetchOptions,
+      })
+
+      if (!updateResponse.ok) {
+        throw new Error(`Failed to update event: ${updateResponse.status}`)
+      }
+
+      const newEtag = updateResponse.headers.get('ETag') || undefined
+      return { etag: newEtag }
+    }, 'Failed to create override instance')
   }
 
   async fetchEvent(eventUrl: string): Promise<CalDavResponse<CalDavEvent>> {
@@ -507,12 +915,70 @@ export class CalDavService {
         events: [],
       }
 
-      const existingIndex = icsCalendar.events?.findIndex((e) => e.uid === params.event.uid) ?? -1
+      const existingIndex = icsCalendar.events?.findIndex((e) => {
+        if (e.uid !== params.event.uid) return false
+        // Source event update: match by UID + no recurrenceId
+        if (!params.event.recurrenceId) return !e.recurrenceId
+        // Override update: match by UID + specific recurrenceId value
+        if (!e.recurrenceId) return false
+        const paramRecId = params.event.recurrenceId.value
+        const eRecId = e.recurrenceId.value
+        return (
+          eRecId.date.getTime() === paramRecId.date.getTime() ||
+          eRecId.local?.date.getTime() === paramRecId.local?.date.getTime()
+        )
+      }) ?? -1
       if (existingIndex >= 0 && icsCalendar.events) {
+        const oldEvent = icsCalendar.events[existingIndex]
         const updatedEvent = { ...params.event }
         updatedEvent.sequence = (updatedEvent.sequence ?? 0) + 1
         icsCalendar.events = [...icsCalendar.events]
         icsCalendar.events[existingIndex] = updatedEvent
+
+        // When updating the source of a recurring series with a time change,
+        // shift EXDATE entries and override RECURRENCE-IDs to match the new occurrence times.
+        if (updatedEvent.recurrenceRule && !updatedEvent.recurrenceId) {
+          const oldStartMs = (oldEvent.start.local?.date ?? oldEvent.start.date).getTime()
+          const newStartMs = (updatedEvent.start.local?.date ?? updatedEvent.start.date).getTime()
+
+          if (oldStartMs !== newStartMs) {
+            const deltaMs = newStartMs - oldStartMs
+
+            // Shift EXDATE entries on the updated source event
+            if (updatedEvent.exceptionDates?.length) {
+              updatedEvent.exceptionDates = updatedEvent.exceptionDates.map((exd) => ({
+                ...exd,
+                date: new Date(exd.date.getTime() + deltaMs),
+                local: exd.local ? {
+                  ...exd.local,
+                  date: new Date(exd.local.date.getTime() + deltaMs),
+                } : undefined,
+              }))
+              icsCalendar.events[existingIndex] = updatedEvent
+            }
+
+            // Shift override RECURRENCE-IDs
+            for (let i = 0; i < icsCalendar.events.length; i++) {
+              const evt = icsCalendar.events[i]
+              if (evt.uid === params.event.uid && evt.recurrenceId) {
+                icsCalendar.events[i] = {
+                  ...evt,
+                  recurrenceId: {
+                    ...evt.recurrenceId,
+                    value: {
+                      ...evt.recurrenceId.value,
+                      date: new Date(evt.recurrenceId.value.date.getTime() + deltaMs),
+                      local: evt.recurrenceId.value.local ? {
+                        ...evt.recurrenceId.value.local,
+                        date: new Date(evt.recurrenceId.value.local.date.getTime() + deltaMs),
+                      } : undefined,
+                    },
+                  },
+                }
+              }
+            }
+          }
+        }
       } else {
         icsCalendar.events = [params.event]
       }
