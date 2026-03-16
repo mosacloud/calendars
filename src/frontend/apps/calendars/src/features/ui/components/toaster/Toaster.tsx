@@ -55,3 +55,16 @@ export const addToast = (
     ...options,
   });
 };
+
+/**
+ * Show an error toast with a simple string message.
+ * Convenience wrapper usable from .ts files (no JSX needed).
+ */
+export const addErrorToast = (message: string) => {
+  return toast.error(message, {
+    position: "bottom-center",
+    className: "suite__toaster__wrapper",
+    autoClose: 8000,
+    hideProgressBar: true,
+  });
+};
