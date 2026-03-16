@@ -28,6 +28,7 @@ import type { EventCalendarEvent } from "../../services/dav/types/event-calendar
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 import { EventModal } from "./EventModal";
+import { RecurringEditModal } from "./RecurringEditModal";
 import { SchedulerToolbar } from "./SchedulerToolbar";
 import type { SchedulerProps, EventModalState, MobileListEvent } from "./types";
 import { useSchedulerHandlers } from "./hooks/useSchedulerHandlers";
@@ -129,6 +130,9 @@ export const Scheduler = ({ defaultCalendarUrl }: SchedulerProps) => {
     handleModalDelete,
     handleModalClose,
     handleRespondToInvitation,
+    pendingRecurringAction,
+    handlePendingRecurringConfirm,
+    handlePendingRecurringCancel,
   } = useSchedulerHandlers({
     adapter,
     caldavService,
@@ -387,6 +391,12 @@ export const Scheduler = ({ defaultCalendarUrl }: SchedulerProps) => {
         onDelete={modalState.mode === "edit" ? handleModalDelete : undefined}
         onRespondToInvitation={handleRespondToInvitation}
         onClose={handleModalClose}
+      />
+
+      <RecurringEditModal
+        isOpen={!!pendingRecurringAction}
+        onConfirm={handlePendingRecurringConfirm}
+        onCancel={handlePendingRecurringCancel}
       />
     </div>
   );

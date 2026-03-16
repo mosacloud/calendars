@@ -3,10 +3,11 @@
  * Provides all event handlers for the Scheduler component.
  */
 
-import { useCallback, MutableRefObject } from "react";
-import { IcsEvent } from "ts-ics";
+import { useCallback, useState, MutableRefObject } from "react";
+import { IcsEvent, IcsDateObject } from "ts-ics";
 
 import { useAuth } from "@/features/auth/Auth";
+import { addErrorToast } from "@/features/ui/components/toaster/Toaster";
 import type {
   EventCalendarEvent,
   EventCalendarSelectInfo,
@@ -17,10 +18,49 @@ import type {
 } from "../../../services/dav/types/event-calendar";
 import type { EventCalendarAdapter, CalDavExtendedProps } from "../../../services/dav/EventCalendarAdapter";
 import type { CalDavService } from "../../../services/dav/CalDavService";
-import type { EventModalState, RecurringDeleteOption } from "../types";
+import type {
+  EventModalState,
+  RecurringDeleteOption,
+  RecurringEditOption,
+} from "../types";
 
 // Get browser timezone
 const BROWSER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+/**
+ * Merge source event's date (year/month/day) with form event's time
+ * (hours/minutes/seconds). Both use the "fake UTC" pattern where
+ * UTC components represent local timezone values.
+ */
+function mergeSourceDateWithFormTime(
+  sourceDate: IcsDateObject,
+  formDate: IcsDateObject,
+): IcsDateObject {
+  const src = sourceDate.date;
+  const frm = formDate.date;
+
+  const merged = new Date(
+    Date.UTC(
+      src.getUTCFullYear(),
+      src.getUTCMonth(),
+      src.getUTCDate(),
+      frm.getUTCHours(),
+      frm.getUTCMinutes(),
+      frm.getUTCSeconds(),
+    ),
+  );
+
+  return {
+    ...formDate,
+    date: merged,
+    local: formDate.local
+      ? {
+          ...formDate.local,
+          date: merged,
+        }
+      : undefined,
+  };
+}
 
 type ECEvent = EventCalendarEvent;
 
@@ -41,6 +81,15 @@ interface UseSchedulerHandlersProps {
   setModalState: React.Dispatch<React.SetStateAction<EventModalState>>;
 }
 
+/**
+ * Pending recurring action for drag-and-drop or resize operations.
+ * Stored so the recurring edit modal can resolve it.
+ */
+export interface PendingRecurringAction {
+  type: 'drop' | 'resize';
+  info: EventCalendarEventDropInfo | EventCalendarEventResizeInfo;
+}
+
 export const useSchedulerHandlers = ({
   adapter,
   caldavService,
@@ -50,10 +99,12 @@ export const useSchedulerHandlers = ({
   setModalState,
 }: UseSchedulerHandlersProps) => {
   const { user } = useAuth();
+  const [pendingRecurringAction, setPendingRecurringAction] =
+    useState<PendingRecurringAction | null>(null);
 
   /**
    * Handle event drop (drag & drop to new time/date).
-   * Uses adapter to correctly convert dates with timezone.
+   * For recurring events, shows a prompt before applying changes.
    */
   const handleEventDrop = useCallback(
     async (info: EventCalendarEventDropInfo) => {
@@ -62,6 +113,12 @@ export const useSchedulerHandlers = ({
       if (!extProps?.eventUrl) {
         console.error("No eventUrl in extendedProps, cannot update");
         info.revert();
+        return;
+      }
+
+      // If recurring, defer to the recurring edit modal
+      if (extProps.recurrenceRule) {
+        setPendingRecurringAction({ type: 'drop', info });
         return;
       }
 
@@ -82,7 +139,6 @@ export const useSchedulerHandlers = ({
           return;
         }
 
-        // Update etag for next update
         if (result.data?.etag && calendarRef.current) {
           const updatedEvent = {
             ...info.event,
@@ -100,6 +156,7 @@ export const useSchedulerHandlers = ({
 
   /**
    * Handle event resize (change duration).
+   * For recurring events, shows a prompt before applying changes.
    */
   const handleEventResize = useCallback(
     async (info: EventCalendarEventResizeInfo) => {
@@ -108,6 +165,12 @@ export const useSchedulerHandlers = ({
       if (!extProps?.eventUrl) {
         console.error("No eventUrl in extendedProps, cannot update");
         info.revert();
+        return;
+      }
+
+      // If recurring, defer to the recurring edit modal
+      if (extProps.recurrenceRule) {
+        setPendingRecurringAction({ type: 'resize', info });
         return;
       }
 
@@ -128,7 +191,6 @@ export const useSchedulerHandlers = ({
           return;
         }
 
-        // Update etag
         if (result.data?.etag && calendarRef.current) {
           const updatedEvent = {
             ...info.event,
@@ -240,14 +302,15 @@ export const useSchedulerHandlers = ({
 
   /**
    * Handle modal save (create or update event).
+   * For recurring events, `option` determines the scope of the edit.
    */
   const handleModalSave = useCallback(
     async (
       event: IcsEvent,
       targetCalendarUrl: string,
+      option?: RecurringEditOption,
     ) => {
       if (modalState.mode === "create") {
-        // Create new event
         const result = await caldavService.createEvent({
           calendarUrl: targetCalendarUrl,
           event,
@@ -257,37 +320,154 @@ export const useSchedulerHandlers = ({
           throw new Error(result.error || "Failed to create event");
         }
 
-        // Refetch events to ensure proper timezone conversion
-        // (optimistic add would use fake UTC dates from the modal,
-        // causing a +1h offset until refresh)
         if (calendarRef.current) {
           calendarRef.current.refetchEvents();
         }
+        return;
+      }
+
+      // Edit mode
+      if (!modalState.eventUrl) {
+        throw new Error("No event URL for update");
+      }
+
+      // Use the ORIGINAL event (before user edits) for occurrence date.
+      // The form-built event has potentially modified dates.
+      const originalEvent = modalState.event;
+
+      /**
+       * Get occurrence date from the original modal event (fake UTC).
+       */
+      const getOccurrenceDate = (): Date => {
+        if (originalEvent?.recurrenceId?.value?.date) {
+          return originalEvent.recurrenceId.value.date;
+        }
+        if (originalEvent?.start?.date instanceof Date) {
+          return originalEvent.start.date;
+        }
+        if (originalEvent?.start?.date) {
+          return new Date(originalEvent.start.date);
+        }
+        // Fallback to form event start
+        return event.start.date instanceof Date
+          ? event.start.date
+          : new Date(event.start.date);
+      };
+
+      if (option === 'this') {
+        // Create an override instance for this occurrence only
+        const occurrenceDate = getOccurrenceDate();
+
+        const result = await caldavService.createOverrideInstance(
+          modalState.eventUrl,
+          event,
+          occurrenceDate,
+          modalState.etag,
+        );
+
+        if (!result.success) {
+          throw new Error(result.error || "Failed to create override instance");
+        }
+      } else if (option === 'future') {
+        // Truncate the original series and create a new recurring series
+        const fetchResult = await caldavService.fetchEvent(modalState.eventUrl);
+        if (!fetchResult.success || !fetchResult.data) {
+          throw new Error("Failed to fetch source event");
+        }
+
+        const sourceIcsEvents = fetchResult.data.data.events ?? [];
+        const sourceEvent = sourceIcsEvents.find(
+          (e) => e.uid === event.uid && !e.recurrenceId,
+        );
+
+        if (!sourceEvent) {
+          throw new Error("Source event not found");
+        }
+
+        // Use the ORIGINAL occurrence date for the UNTIL boundary
+        const occurrenceDate = getOccurrenceDate();
+
+        // Truncate the original series: sets UNTIL, removes overrides and
+        // EXDATEs >= cutoff in one atomic PUT (prevents orphan overrides).
+        const truncateResult = await caldavService.truncateRecurringSeries(
+          modalState.eventUrl,
+          occurrenceDate,
+          event.uid,
+          fetchResult.data.etag,
+        );
+
+        if (!truncateResult.success) {
+          throw new Error(truncateResult.error || "Failed to truncate series");
+        }
+
+        // Create a new recurring event starting from the modified occurrence
+        const newSeriesEvent: IcsEvent = {
+          ...event,
+          uid: crypto.randomUUID(),
+          recurrenceId: undefined,
+          recurrenceRule: sourceEvent.recurrenceRule,
+          sequence: 0,
+        };
+
+        const createResult = await caldavService.createEvent({
+          calendarUrl: targetCalendarUrl,
+          event: newSeriesEvent,
+        });
+
+        if (!createResult.success) {
+          throw new Error(createResult.error || "Failed to create new series");
+        }
       } else {
-        // Update existing event
-        if (!modalState.eventUrl) {
-          throw new Error("No event URL for update");
+        // 'all' or undefined: update the entire series.
+        // Fetch source to preserve exceptionDates and overrides.
+        let eventToUpdate = event;
+        let etag = modalState.etag;
+
+        const fetchResult = await caldavService.fetchEvent(modalState.eventUrl);
+        if (fetchResult.success && fetchResult.data) {
+          const sourceEvents = fetchResult.data.data.events ?? [];
+          const sourceEvent = sourceEvents.find(
+            (e) => e.uid === event.uid && !e.recurrenceId,
+          );
+          if (sourceEvent) {
+            // Merge: keep sourceEvent's date (year/month/day) to preserve DTSTART,
+            // but apply user's time changes (hours/minutes) from the form.
+            const mergedStart = mergeSourceDateWithFormTime(
+              sourceEvent.start,
+              event.start,
+            );
+            const mergedEnd = event.end
+              ? mergeSourceDateWithFormTime(sourceEvent.end!, event.end)
+              : undefined;
+
+            eventToUpdate = {
+              ...event,
+              start: mergedStart,
+              end: mergedEnd,
+              duration: sourceEvent.duration,
+              recurrenceId: undefined,
+              exceptionDates: sourceEvent.exceptionDates,
+            } as IcsEvent;
+          }
+          etag = fetchResult.data.etag;
         }
 
         const result = await caldavService.updateEvent({
           eventUrl: modalState.eventUrl,
-          event,
-          etag: modalState.etag,
+          event: eventToUpdate,
+          etag,
         });
 
         if (!result.success) {
           throw new Error(result.error || "Failed to update event");
         }
+      }
 
-        // Refetch events to ensure proper timezone conversion
-        // (optimistic update would use fake UTC dates from the modal,
-        // causing a +1h offset until refresh)
-        if (calendarRef.current) {
-          calendarRef.current.refetchEvents();
-        }
+      if (calendarRef.current) {
+        calendarRef.current.refetchEvents();
       }
     },
-    [caldavService, calendarRef, modalState.mode, modalState.eventUrl, modalState.etag]
+    [caldavService, calendarRef, modalState.mode, modalState.eventUrl, modalState.etag, modalState.event]
   );
 
   /**
@@ -318,15 +498,46 @@ export const useSchedulerHandlers = ({
         }
 
         if (option === 'this') {
-          // Option 1: Delete only this occurrence - Add EXDATE
-          const addExdateResult = await caldavService.addExdateToEvent(
-            modalState.eventUrl,
-            occurrenceDate,
-            modalState.etag
-          );
+          // Delete only this occurrence
+          let shouldDeleteEntireEvent = false;
 
-          if (!addExdateResult.success) {
-            throw new Error(addExdateResult.error || "Failed to add EXDATE");
+          if (event.recurrenceId) {
+            // This is an override instance — remove the override VEVENT
+            // and ensure EXDATE exists on the source event
+            const deleteResult = await caldavService.deleteOverrideInstance(
+              modalState.eventUrl,
+              occurrenceDate,
+              event.uid,
+              modalState.etag
+            );
+
+            if (!deleteResult.success) {
+              throw new Error(deleteResult.error || "Failed to delete override instance");
+            }
+            shouldDeleteEntireEvent = !!deleteResult.data?.shouldDeleteEntireEvent;
+          } else {
+            // Regular occurrence (not an override) — just add EXDATE
+            const addExdateResult = await caldavService.addExdateToEvent(
+              modalState.eventUrl,
+              occurrenceDate,
+              modalState.etag
+            );
+
+            if (!addExdateResult.success) {
+              throw new Error(addExdateResult.error || "Failed to add EXDATE");
+            }
+            shouldDeleteEntireEvent = !!addExdateResult.data?.shouldDeleteEntireEvent;
+          }
+
+          // If the EXDATE would leave zero occurrences, delete entirely
+          if (shouldDeleteEntireEvent) {
+            const fullDeleteResult = await caldavService.deleteEvent(
+              modalState.eventUrl,
+              modalState.etag,
+            );
+            if (!fullDeleteResult.success) {
+              throw new Error(fullDeleteResult.error || "Failed to delete event");
+            }
           }
 
           // Refetch events to update UI
@@ -334,52 +545,38 @@ export const useSchedulerHandlers = ({
             calendarRef.current.refetchEvents();
           }
         } else if (option === 'future') {
-          // Option 2: Delete this and future occurrences - Modify UNTIL
+          // Fetch source event to check if this is the first occurrence
           const fetchResult = await caldavService.fetchEvent(modalState.eventUrl);
-
-          if (!fetchResult.success || !fetchResult.data) {
-            throw new Error("Failed to fetch source event");
-          }
-
-          const sourceIcsEvents = fetchResult.data.data.events ?? [];
-          const sourceEvent = sourceIcsEvents.find(
-            (e) => e.uid === event.uid && !e.recurrenceId
+          const sourceEvents = fetchResult.success && fetchResult.data
+            ? (fetchResult.data.data.events ?? [])
+            : [];
+          const sourceEvent = sourceEvents.find(
+            (e) => e.uid === event.uid && !e.recurrenceId,
           );
 
-          if (!sourceEvent || !sourceEvent.recurrenceRule) {
-            throw new Error("Source event or recurrence rule not found");
+          // If deleting from first occurrence, delete entire series
+          // Use local.date (fake UTC) to match occurrenceDate format (also fake UTC)
+          const sourceStartDate = sourceEvent?.start.local?.date ?? sourceEvent?.start.date;
+          if (sourceEvent && sourceStartDate && occurrenceDate.getTime() <= sourceStartDate.getTime()) {
+            const deleteResult = await caldavService.deleteEvent(
+              modalState.eventUrl,
+              modalState.etag,
+            );
+            if (!deleteResult.success) {
+              throw new Error(deleteResult.error || "Failed to delete event");
+            }
+          } else {
+            const truncateResult = await caldavService.truncateRecurringSeries(
+              modalState.eventUrl,
+              occurrenceDate,
+              event.uid,
+              modalState.etag,
+            );
+            if (!truncateResult.success) {
+              throw new Error(truncateResult.error || "Failed to truncate series");
+            }
           }
 
-          // Set UNTIL to the day before this occurrence
-          const untilDate = new Date(occurrenceDate);
-          untilDate.setDate(untilDate.getDate() - 1);
-          untilDate.setHours(23, 59, 59, 999);
-
-          const updatedRecurrenceRule = {
-            ...sourceEvent.recurrenceRule,
-            until: {
-              type: 'DATE-TIME' as const,
-              date: untilDate,
-            },
-            count: undefined, // Remove count if present
-          };
-
-          const updatedEvent: IcsEvent = {
-            ...sourceEvent,
-            recurrenceRule: updatedRecurrenceRule,
-          };
-
-          const updateResult = await caldavService.updateEvent({
-            eventUrl: modalState.eventUrl,
-            event: updatedEvent,
-            etag: modalState.etag,
-          });
-
-          if (!updateResult.success) {
-            throw new Error(updateResult.error || "Failed to update event");
-          }
-
-          // Refetch events to update UI
           if (calendarRef.current) {
             calendarRef.current.refetchEvents();
           }
@@ -453,6 +650,301 @@ export const useSchedulerHandlers = ({
     [caldavService, user, calendarRef, modalState.eventUrl, modalState.etag, setModalState]
   );
 
+  /**
+   * Get the occurrence date (in fake UTC) from a drag/resize info.
+   * Uses the OLD event (before drag/resize) converted through the adapter
+   * so the date matches the DTSTART format used in the ICS.
+   */
+  const getOccurrenceDateFromInfo = useCallback(
+    (
+      info: EventCalendarEventDropInfo | EventCalendarEventResizeInfo,
+      extProps: CalDavExtendedProps,
+    ): Date | null => {
+      const tz = extProps.timezone || BROWSER_TIMEZONE;
+
+      // If already an override instance, use its recurrenceId.
+      // SabreDAV expand returns recurrenceId in real UTC, but we need fake UTC
+      // (UTC components = local timezone time) for EXDATE/RECURRENCE-ID generation.
+      if (extProps.recurrenceId) {
+        // For all-day events, recurrenceId from SabreDAV is already midnight UTC
+        // representing a pure date. No timezone conversion needed (would corrupt it).
+        if (info.event.allDay) {
+          return new Date(Date.UTC(
+            extProps.recurrenceId.getUTCFullYear(),
+            extProps.recurrenceId.getUTCMonth(),
+            extProps.recurrenceId.getUTCDate(),
+          ));
+        }
+        // For timed events, convert real UTC → fake UTC
+        const components = adapter.getDateComponentsInTimezone(
+          extProps.recurrenceId,
+          tz,
+        );
+        return new Date(Date.UTC(
+          components.year,
+          components.month - 1,
+          components.day,
+          components.hours,
+          components.minutes,
+          components.seconds,
+        ));
+      }
+
+      // Convert the old event through the adapter to get fake UTC date
+      const oldEvent = 'oldEvent' in info
+        ? (info.oldEvent as EventCalendarEvent | undefined)
+        : undefined;
+
+      if (oldEvent) {
+        const oldIcsEvent = adapter.toIcsEvent(oldEvent, {
+          defaultTimezone: tz,
+        });
+        const result = oldIcsEvent.start.date instanceof Date
+          ? oldIcsEvent.start.date
+          : new Date(oldIcsEvent.start.date);
+        return result;
+      }
+
+      return null;
+    },
+    [adapter],
+  );
+
+  /**
+   * Handle confirming a recurring edit for pending drag-drop/resize.
+   */
+  const handlePendingRecurringConfirm = useCallback(
+    async (option: RecurringEditOption) => {
+      if (!pendingRecurringAction) return;
+
+      const info = pendingRecurringAction.info;
+      const extProps = info.event.extendedProps as CalDavExtendedProps;
+      setPendingRecurringAction(null);
+
+      if (!extProps?.eventUrl) {
+        info.revert();
+        return;
+      }
+
+      const eventUrl = extProps.eventUrl;
+      const tz = extProps.timezone || BROWSER_TIMEZONE;
+
+      try {
+        if (option === 'this') {
+          // Get occurrence date from BEFORE the drag/resize (in fake UTC)
+          const occurrenceDate = getOccurrenceDateFromInfo(info, extProps);
+          if (!occurrenceDate) {
+            info.revert();
+            return;
+          }
+
+          // Convert the NEW event (after drag/resize) to ICS
+          const newIcsEvent = adapter.toIcsEvent(
+            info.event as EventCalendarEvent,
+            { defaultTimezone: tz },
+          );
+
+          const result = await caldavService.createOverrideInstance(
+            eventUrl,
+            newIcsEvent,
+            occurrenceDate,
+            extProps.etag,
+          );
+
+          if (!result.success) {
+            addErrorToast(result.error || "Failed to update event");
+            info.revert();
+            return;
+          }
+        } else if (option === 'future') {
+          // Get occurrence date from BEFORE the drag/resize
+          const occurrenceDate = getOccurrenceDateFromInfo(info, extProps);
+          if (!occurrenceDate) {
+            info.revert();
+            return;
+          }
+
+          // Fetch source event from server
+          const fetchResult = await caldavService.fetchEvent(eventUrl);
+          if (!fetchResult.success || !fetchResult.data) {
+            addErrorToast("Failed to fetch event");
+            info.revert();
+            return;
+          }
+
+          const sourceIcsEvents = fetchResult.data.data.events ?? [];
+          const sourceEvent = sourceIcsEvents.find(
+            (e) => e.uid === extProps.uid && !e.recurrenceId,
+          );
+
+          if (!sourceEvent) {
+            addErrorToast("Source event not found");
+            info.revert();
+            return;
+          }
+
+          // Truncate the original series: sets UNTIL, removes overrides and
+          // EXDATEs >= cutoff in one atomic PUT (prevents orphan overrides).
+          const truncateResult = await caldavService.truncateRecurringSeries(
+            eventUrl,
+            occurrenceDate,
+            extProps.uid,
+            fetchResult.data.etag,
+          );
+
+          if (!truncateResult.success) {
+            addErrorToast(truncateResult.error || "Failed to truncate series");
+            info.revert();
+            return;
+          }
+
+          // Create new series with the dragged event's new times
+          const newIcsEvent = adapter.toIcsEvent(
+            info.event as EventCalendarEvent,
+            { defaultTimezone: tz },
+          );
+
+          const newSeriesEvent: IcsEvent = {
+            ...newIcsEvent,
+            uid: crypto.randomUUID(),
+            recurrenceId: undefined,
+            recurrenceRule: sourceEvent.recurrenceRule,
+            sequence: 0,
+          };
+
+          const calUrl = extProps.calendarUrl || calendarUrl;
+          const createResult = await caldavService.createEvent({
+            calendarUrl: calUrl,
+            event: newSeriesEvent,
+          });
+
+          if (!createResult.success) {
+            addErrorToast(createResult.error || "Failed to create new series");
+            info.revert();
+            return;
+          }
+        } else {
+          // 'all': Fetch source event, compute delta, apply to source
+          // This preserves RRULE, EXDATE, and all other ICS properties.
+          const fetchResult = await caldavService.fetchEvent(eventUrl);
+          if (!fetchResult.success || !fetchResult.data) {
+            addErrorToast("Failed to fetch event");
+            info.revert();
+            return;
+          }
+
+          const sourceIcsEvents = fetchResult.data.data.events ?? [];
+          const sourceEvent = sourceIcsEvents.find(
+            (e) => e.uid === extProps.uid && !e.recurrenceId,
+          );
+
+          if (!sourceEvent) {
+            addErrorToast("Source event not found");
+            info.revert();
+            return;
+          }
+
+          // Compute time delta from old→new position
+          // (browser-local ms delta = same delta in any timezone)
+          const oldEvent = 'oldEvent' in info
+            ? (info.oldEvent as EventCalendarEvent | undefined)
+            : undefined;
+
+          if (!oldEvent) {
+            info.revert();
+            return;
+          }
+
+          const oldStartMs = oldEvent.start instanceof Date
+            ? oldEvent.start.getTime()
+            : new Date(oldEvent.start).getTime();
+          const newStartMs = info.event.start instanceof Date
+            ? (info.event.start as Date).getTime()
+            : new Date(info.event.start as string).getTime();
+          const startDeltaMs = newStartMs - oldStartMs;
+
+          let endDeltaMs = startDeltaMs;
+          if (oldEvent.end && info.event.end) {
+            const oldEndMs = oldEvent.end instanceof Date
+              ? oldEvent.end.getTime()
+              : new Date(oldEvent.end).getTime();
+            const newEndMs = info.event.end instanceof Date
+              ? (info.event.end as Date).getTime()
+              : new Date(info.event.end as string).getTime();
+            endDeltaMs = newEndMs - oldEndMs;
+          }
+
+          // Apply delta separately to .date (TRUE UTC) and .local.date (FAKE UTC)
+          // to preserve the timezone model used by ts-ics/generateIcsCalendar
+          const newStartDate = new Date(
+            sourceEvent.start.date.getTime() + startDeltaMs,
+          );
+
+          const updatedEvent: IcsEvent = {
+            ...sourceEvent,
+            start: {
+              ...sourceEvent.start,
+              date: newStartDate,
+              local: sourceEvent.start.local ? {
+                ...sourceEvent.start.local,
+                date: new Date(
+                  sourceEvent.start.local.date.getTime() + startDeltaMs,
+                ),
+              } : undefined,
+            },
+          };
+
+          if (sourceEvent.end) {
+            const newEndDate = new Date(
+              sourceEvent.end.date.getTime() + endDeltaMs,
+            );
+            updatedEvent.end = {
+              ...sourceEvent.end,
+              date: newEndDate,
+              local: sourceEvent.end.local ? {
+                ...sourceEvent.end.local,
+                date: new Date(
+                  sourceEvent.end.local.date.getTime() + endDeltaMs,
+                ),
+              } : undefined,
+            };
+          }
+
+          const result = await caldavService.updateEvent({
+            eventUrl,
+            event: updatedEvent,
+            etag: fetchResult.data.etag,
+          });
+
+          if (!result.success) {
+            addErrorToast(result.error || "Failed to update event");
+            info.revert();
+            return;
+          }
+        }
+
+        if (calendarRef.current) {
+          calendarRef.current.refetchEvents();
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to update event";
+        addErrorToast(message);
+        info.revert();
+      }
+    },
+    [pendingRecurringAction, adapter, caldavService, calendarRef, calendarUrl, getOccurrenceDateFromInfo]
+  );
+
+  /**
+   * Cancel a pending recurring action (revert the drag/resize).
+   */
+  const handlePendingRecurringCancel = useCallback(() => {
+    if (pendingRecurringAction) {
+      pendingRecurringAction.info.revert();
+      setPendingRecurringAction(null);
+    }
+  }, [pendingRecurringAction]);
+
   return {
     handleEventDrop,
     handleEventResize,
@@ -463,5 +955,8 @@ export const useSchedulerHandlers = ({
     handleModalDelete,
     handleModalClose,
     handleRespondToInvitation,
+    pendingRecurringAction,
+    handlePendingRecurringConfirm,
+    handlePendingRecurringCancel,
   };
 };
