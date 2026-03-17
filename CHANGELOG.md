@@ -10,6 +10,10 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- ♻️(frontend) load favicon from asset file instead of inline SVG
+
 ### Added
 
 - 👷(docker) add arm64 platform support for image builds
