@@ -165,6 +165,11 @@
           "deleteThisOccurrence": "Only this occurrence",
           "deleteThisAndFuture": "This and future occurrences",
           "deleteAllOccurrences": "All occurrences",
+          "editRecurringTitle": "Edit recurring event",
+          "editRecurringPrompt": "This is a recurring event. What would you like to edit?",
+          "editThisOccurrence": "Only this occurrence",
+          "editThisAndFuture": "This and future occurrences",
+          "editAllOccurrences": "All occurrences",
           "enterChoice": "Enter your choice (1, 2, or 3):",
           "invalidChoice": "Invalid choice. Please enter 1, 2, or 3.",
           "delete": "Delete",
@@ -316,7 +321,8 @@
             "leapYear": "This date (Feb 29) only exists in leap years",
             "monthMax30": "This month has at most 30 days",
             "dayMax31": "Day must be between 1 and 31"
-          }
+          },
+          "advancedPropertiesWarning": "This recurrence pattern uses advanced properties that cannot be fully edited here. Saving may simplify the pattern."
         },
         "createCalendar": {
           "title": "Create a calendar",
@@ -1022,6 +1028,11 @@
           "deleteThisOccurrence": "Seulement cette occurrence",
           "deleteThisAndFuture": "Cette occurrence et les suivantes",
           "deleteAllOccurrences": "Toutes les occurrences",
+          "editRecurringTitle": "Modifier l'événement récurrent",
+          "editRecurringPrompt": "Ceci est un événement récurrent. Que souhaitez-vous modifier ?",
+          "editThisOccurrence": "Seulement cette occurrence",
+          "editThisAndFuture": "Cette occurrence et les suivantes",
+          "editAllOccurrences": "Toutes les occurrences",
           "enterChoice": "Entrez votre choix (1, 2 ou 3) :",
           "invalidChoice": "Choix invalide. Veuillez entrer 1, 2 ou 3.",
           "delete": "Supprimer",
@@ -1173,7 +1184,8 @@
             "leapYear": "Cette date (29 février) n'existe que les années bissextiles",
             "monthMax30": "Ce mois a au maximum 30 jours",
             "dayMax31": "Le jour doit être entre 1 et 31"
-          }
+          },
+          "advancedPropertiesWarning": "Ce modèle de récurrence utilise des propriétés avancées qui ne peuvent pas être entièrement éditées ici. L'enregistrement peut simplifier le modèle."
         },
         "createCalendar": {
           "title": "Créer un calendrier",
@@ -1621,6 +1633,11 @@
           "deleteThisOccurrence": "Alleen deze gebeurtenis",
           "deleteThisAndFuture": "Deze en toekomstige gebeurtenissen",
           "deleteAllOccurrences": "Alle gebeurtenissen",
+          "editRecurringTitle": "Terugkerend evenement bewerken",
+          "editRecurringPrompt": "Dit is een terugkerend evenement. Wat wilt u bewerken?",
+          "editThisOccurrence": "Alleen deze gebeurtenis",
+          "editThisAndFuture": "Deze en toekomstige gebeurtenissen",
+          "editAllOccurrences": "Alle gebeurtenissen",
           "enterChoice": "Voer uw keuze in (1, 2 of 3):",
           "invalidChoice": "Ongeldige keuze. Voer 1, 2 of 3 in.",
           "delete": "Verwijderen",
@@ -1772,7 +1789,8 @@
             "leapYear": "Deze datum (29 februari) bestaat alleen in schrikkeljaren",
             "monthMax30": "Deze maand heeft maximaal 30 dagen",
             "dayMax31": "Dag moet tussen 1 en 31 zijn"
-          }
+          },
+          "advancedPropertiesWarning": "Dit herhalingspatroon gebruikt geavanceerde eigenschappen die hier niet volledig bewerkt kunnen worden. Opslaan kan het patroon vereenvoudigen."
         },
         "createCalendar": {
           "title": "Kalender aanmaken",

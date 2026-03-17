@@ -23,6 +23,33 @@ const MONTHS = [
   { value: 12, key: "december" },
 ];
 
+const ADVANCED_RRULE_KEYS: (keyof IcsRecurrenceRule)[] = [
+  "bySetPos",
+  "byYearday",
+  "byWeekNo",
+];
+
+function hasAdvancedProperties(rule?: IcsRecurrenceRule): boolean {
+  if (!rule) return false;
+  return ADVANCED_RRULE_KEYS.some(
+    (key) => rule[key] !== undefined && rule[key] !== null,
+  );
+}
+
+function getAdvancedProperties(
+  rule?: IcsRecurrenceRule,
+): Partial<IcsRecurrenceRule> {
+  if (!rule) return {};
+  const result: Partial<IcsRecurrenceRule> = {};
+  for (const key of ADVANCED_RRULE_KEYS) {
+    if (rule[key] !== undefined && rule[key] !== null) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (result as any)[key] = rule[key];
+    }
+  }
+  return result;
+}
+
 interface RecurrenceEditorProps {
   value?: IcsRecurrenceRule;
   onChange: (rule: IcsRecurrenceRule | undefined) => void;
@@ -175,6 +202,7 @@ export function RecurrenceEditor({ value, onChange }: RecurrenceEditorProps) {
       byMonth: undefined,
       count: undefined,
       until: undefined,
+      ...getAdvancedProperties(value),
     });
   };
 
@@ -234,6 +262,8 @@ export function RecurrenceEditor({ value, onChange }: RecurrenceEditorProps) {
       : null;
 
 
+  const showAdvancedWarning = hasAdvancedProperties(value);
+
   return (
     <div className="recurrence-editor">
       <Select
@@ -245,6 +275,12 @@ export function RecurrenceEditor({ value, onChange }: RecurrenceEditorProps) {
         variant="classic"
         fullWidth
       />
+
+      {showAdvancedWarning && (
+        <div className="recurrence-editor__warning">
+          {t("calendar.recurrence.advancedPropertiesWarning")}
+        </div>
+      )}
 
       {isCustom && (
         <div className="recurrence-editor__card">

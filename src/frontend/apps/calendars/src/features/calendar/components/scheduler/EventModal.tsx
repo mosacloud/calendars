@@ -12,6 +12,7 @@ import {
 import { useAuth } from "@/features/auth/Auth";
 import { addToast, ToasterItem } from "@/features/ui/components/toaster/Toaster";
 import { DeleteEventModal } from "./DeleteEventModal";
+import { RecurringEditModal } from "./RecurringEditModal";
 import { useEventForm } from "./hooks/useEventForm";
 import { DateTimeSection } from "./event-modal-sections/DateTimeSection";
 import { RecurrenceSection } from "./event-modal-sections/RecurrenceSection";
@@ -25,7 +26,11 @@ import { FreeBusySection } from "./event-modal-sections/FreeBusySection";
 import { SectionPills } from "./event-modal-sections/SectionPills";
 import { useResourcePrincipals } from "@/features/resources/api/useResourcePrincipals";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import type { EventModalProps, RecurringDeleteOption } from "./types";
+import type {
+  EventModalProps,
+  RecurringDeleteOption,
+  RecurringEditOption,
+} from "./types";
 import { SectionRow } from "./event-modal-sections/SectionRow";
 
 export const EventModal = ({
@@ -45,6 +50,7 @@ export const EventModal = ({
   const isMobile = useIsMobile();
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showEditRecurringModal, setShowEditRecurringModal] = useState(false);
 
   const { resources: availableResources } = useResourcePrincipals();
 
@@ -82,7 +88,10 @@ export const EventModal = ({
     );
   };
 
-  const handleSave = async () => {
+  const isRecurringEvent =
+    mode === "edit" && !!(event?.recurrenceRule || event?.recurrenceId);
+
+  const doSave = async (option?: RecurringEditOption) => {
     setIsLoading(true);
     try {
       const icsEvent = form.toIcsEvent();
@@ -90,6 +99,7 @@ export const EventModal = ({
       await onSave(
         icsEvent,
         form.selectedCalendarUrl,
+        option,
       );
       onClose();
     } catch (error) {
@@ -98,6 +108,19 @@ export const EventModal = ({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (isRecurringEvent) {
+      setShowEditRecurringModal(true);
+      return;
+    }
+    await doSave();
+  };
+
+  const handleEditRecurringConfirm = async (option: RecurringEditOption) => {
+    setShowEditRecurringModal(false);
+    await doSave(option);
   };
 
   const handleDeleteConfirm = async (option?: RecurringDeleteOption) => {
@@ -359,9 +382,15 @@ export const EventModal = ({
 
       <DeleteEventModal
         isOpen={showDeleteModal}
-        isRecurring={!!form.recurrence}
+        isRecurring={isRecurringEvent}
         onConfirm={handleDeleteConfirm}
         onCancel={() => setShowDeleteModal(false)}
+      />
+
+      <RecurringEditModal
+        isOpen={showEditRecurringModal}
+        onConfirm={handleEditRecurringConfirm}
+        onCancel={() => setShowEditRecurringModal(false)}
       />
     </>
   );
