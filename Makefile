@@ -107,7 +107,7 @@ logs: ## display all services logs (follow mode)
 .PHONY: logs
 
 start: ## start all development services
-	@$(COMPOSE) up --force-recreate -d worker-dev frontend-dev
+	@$(COMPOSE) up --force-recreate -d worker-dev frontend-dev backend-dev keycloak
 .PHONY: start
 
 start-back: ## start backend services only (for local frontend development)
