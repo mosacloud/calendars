@@ -36,6 +36,7 @@ i18n
     interpolation: {
       escapeValue: false,
     },
+    showSupportNotice: false,
     preload: LANGUAGES_ALLOWED,
   })
   .catch(() => {

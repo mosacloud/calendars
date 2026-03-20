@@ -244,12 +244,21 @@ class CalDAVProxyView(View):
                 allow_redirects=False,
             )
 
-            # Log authentication failures for debugging (without sensitive headers)
+            # Log CalDAV proxy details for debugging
             if response.status_code == 401:
                 logger.warning(
                     "CalDAV server returned 401 for user %s at %s",
                     effective_user.email,
                     target_url,
+                )
+            if request.method == "PROPFIND":
+                logger.warning(
+                    "CalDAV PROPFIND %s -> %s (status=%s, body_len=%d, content_type=%s)",
+                    target_url,
+                    effective_user.email,
+                    response.status_code,
+                    len(response.content),
+                    response.headers.get("Content-Type", "?"),
                 )
 
             # Build Django response

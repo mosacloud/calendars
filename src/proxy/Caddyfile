@@ -83,7 +83,7 @@
 
 # Internal CalDAV server (SabreDAV via PHP-FPM)
 # Only accessible from localhost - Django proxies to this
-http://localhost:9001 {
+http://localhost:9001, http://127.0.0.1:9001 {
 	route {
 		reverse_proxy unix//tmp/php-fpm.sock {
 			transport fastcgi {

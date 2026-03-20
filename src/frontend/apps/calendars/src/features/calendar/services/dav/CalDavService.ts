@@ -94,6 +94,13 @@ export class CalDavService {
         fetchOptions: credentials.fetchOptions,
       })
 
+      if (!account.homeUrl) {
+        throw new Error(
+          'CalDAV discovery failed: calendar home URL not found. ' +
+          'The server may not have a calendar provisioned for this user.'
+        )
+      }
+
       this._account = {
         serverUrl: credentials.serverUrl,
         rootUrl: account.rootUrl,
@@ -122,6 +129,9 @@ export class CalDavService {
   async fetchCalendars(): Promise<CalDavResponse<CalDavCalendar[]>> {
     if (!this._account) {
       return { success: false, error: 'Not connected to server' }
+    }
+    if (!this._account.homeUrl) {
+      return { success: false, error: 'Calendar home URL not available' }
     }
 
     return withErrorHandling(async () => {
