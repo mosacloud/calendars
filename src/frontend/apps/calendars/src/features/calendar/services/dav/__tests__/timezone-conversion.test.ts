@@ -222,14 +222,22 @@ describe('jsDateToIcsDate', () => {
 
   // 6.2 Europe/Paris winter: UTC 14:00 → fake UTC hours 15
   it('creates correct fake UTC for Europe/Paris winter (CET, UTC+1)', () => {
-    // This simulates an event displayed at 15:00 Paris local time.
-    // EventCalendar gives us "2026-01-29T15:00:00.000" as a local time string.
-    // new Date("2026-01-29T15:00:00.000") creates a browser-local Date.
-    // The adapter should convert this to 15:00 Paris time in the fake UTC.
-    const icsEvent = adapter.toIcsEvent(
-      makeEcEvent('2026-01-29T15:00:00.000', 'Europe/Paris'),
-      { defaultTimezone: 'Europe/Paris' }
-    )
+    // An event at 15:00 Paris (CET) = 14:00 UTC in January.
+    // Use an explicit UTC date so the test is deterministic regardless of CI timezone.
+    const utcDate = new Date('2026-01-29T14:00:00Z')
+    const ecEvent = {
+      id: 'test',
+      start: utcDate,
+      end: utcDate,
+      title: 'Test',
+      allDay: false,
+      extendedProps: {
+        uid: 'test-uid',
+        calendarUrl: '/cal/test/',
+        timezone: 'Europe/Paris',
+      },
+    }
+    const icsEvent = adapter.toIcsEvent(ecEvent, { defaultTimezone: 'Europe/Paris' })
     expect(icsEvent.start.type).toBe('DATE-TIME')
     expect(icsEvent.start.local?.timezone).toBe('Europe/Paris')
     // The fake UTC should have getUTCHours() = 15 (Paris local time)

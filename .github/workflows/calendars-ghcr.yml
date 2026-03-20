@@ -1,0 +1,49 @@
+name: Build and publish OCI images
+
+"on":
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+jobs:
+
+  docker-publish-backend:
+    uses: ./.github/workflows/docker-publish.yml
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    secrets: inherit
+    with:
+      image_name: "backend"
+      context: "src/backend"
+      target: backend-production
+
+  docker-publish-frontend:
+    uses: ./.github/workflows/docker-publish.yml
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    secrets: inherit
+    with:
+      image_name: "frontend"
+      context: "src/frontend"
+      target: frontend-production
+      arm64_reuse_amd64_build_arg: "FRONTEND_IMAGE"
+
+  docker-publish-caldav:
+    uses: ./.github/workflows/docker-publish.yml
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    secrets: inherit
+    with:
+      image_name: "caldav"
+      context: "src/caldav"

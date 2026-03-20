@@ -75,6 +75,12 @@ class UserListThrottleSustained(UserRateThrottle):
     scope = "user_list_sustained"
 
 
+class UserListPagination(Pagination):
+    """Pagination for user autocomplete — return up to 50 results per page."""
+
+    page_size = 50
+
+
 class UserViewSet(
     SerializerPerActionMixin,
     mixins.UpdateModelMixin,
@@ -87,7 +93,7 @@ class UserViewSet(
     queryset = models.User.objects.all().filter(is_active=True)
     serializer_class = serializers.UserSerializer
     get_me_serializer_class = serializers.UserMeSerializer
-    pagination_class = Pagination
+    pagination_class = UserListPagination
     throttle_classes = []
 
     def get_throttles(self):

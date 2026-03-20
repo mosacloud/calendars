@@ -1,3 +1,8 @@
+# When building arm64, CI passes FRONTEND_IMAGE=<amd64-tag> so BuildKit
+# reuses the already-built static output and skips the slow Node build
+# under QEMU.  For local / amd64 builds the default is used.
+ARG FRONTEND_IMAGE=frontend-build-output
+
 FROM node:24-alpine AS frontend-deps
 
 WORKDIR /home/frontend/
@@ -45,6 +50,15 @@ ENV NEXT_PUBLIC_API_ORIGIN=${API_ORIGIN}
 
 RUN npm run build
 
+# Scratch stage that normalises the build output path.
+# When FRONTEND_IMAGE keeps its default value, BuildKit uses this stage.
+FROM scratch AS frontend-build-output
+COPY --from=calendars-builder /home/frontend/apps/calendars/out /srv
+
+# When FRONTEND_IMAGE is overridden to an external image tag, BuildKit
+# pulls that image instead and skips every stage above.
+FROM ${FRONTEND_IMAGE} AS frontend-source
+
 # ---- Front-end image ----
 FROM caddy:2-alpine AS frontend-production
 
@@ -53,9 +67,7 @@ RUN apk update && \
   apk upgrade && \
   rm -rf /var/cache/apk/*
 
-COPY --from=calendars-builder \
-  /home/frontend/apps/calendars/out \
-  /srv
+COPY --from=frontend-source /srv /srv
 
 COPY ./Caddyfile /etc/caddy/Caddyfile
 
