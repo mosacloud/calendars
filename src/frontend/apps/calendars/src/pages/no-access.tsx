@@ -25,7 +25,7 @@ export default function NoAccessPage() {
 
 NoAccessPage.getLayout = function getLayout(page: React.ReactElement) {
   return (
-    <GlobalLayout>
+    <GlobalLayout noRedirect>
       <MainLayout
         enableResize={false}
         hideLeftPanelOnDesktop={true}

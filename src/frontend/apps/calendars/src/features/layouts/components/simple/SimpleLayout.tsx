@@ -18,7 +18,7 @@ export const SimpleLayout = ({ children }: { children: React.ReactNode }) => {
   const { isLeftPanelOpen, setIsLeftPanelOpen } = useLeftPanel();
   return (
     <div>
-      <GlobalLayout>
+      <GlobalLayout noRedirect>
         <MainLayout
           enableResize
           hideLeftPanelOnDesktop={true}

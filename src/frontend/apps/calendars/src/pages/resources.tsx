@@ -1,16 +1,13 @@
-import { useEffect } from "react";
-
 import { MainLayout } from "@gouvfr-lasuite/ui-kit";
 import Head from "next/head";
 import { useTranslation } from "next-i18next";
 
-import { login, useAuth } from "@/features/auth/Auth";
+import { useAuth } from "@/features/auth/Auth";
 import { GlobalLayout } from "@/features/layouts/components/global/GlobalLayout";
 import {
   HeaderIcon,
   HeaderRight,
 } from "@/features/layouts/components/header/Header";
-import { SpinnerPage } from "@/features/ui/components/spinner/SpinnerPage";
 import { Toaster } from "@/features/ui/components/toaster/Toaster";
 import { ResourceList } from "@/features/resources/components/ResourceList";
 import { useResourcePrincipals } from "@/features/resources/api/useResourcePrincipals";
@@ -20,17 +17,7 @@ export default function ResourcesPage() {
   const { user } = useAuth();
   const { resources, isLoading, refresh } = useResourcePrincipals();
 
-  useEffect(() => {
-    if (!user) {
-      login(window.location.href);
-    } else if (user.can_access === false) {
-      window.location.href = "/no-access";
-    }
-  }, [user]);
-
-  if (!user || user.can_access === false) {
-    return <SpinnerPage />;
-  }
+  if (!user) return null;
 
   return (
     <>

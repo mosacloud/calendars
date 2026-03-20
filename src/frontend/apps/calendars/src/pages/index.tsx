@@ -4,6 +4,7 @@ import { useTranslation } from "next-i18next";
 import { Hero, Footer, MainLayout, HomeGutter } from "@gouvfr-lasuite/ui-kit";
 import { login, useAuth } from "@/features/auth/Auth";
 import { useEffect } from "react";
+import { useRouter } from "next/router";
 import banner from "@/assets/home/banner.svg";
 import {
   HeaderIcon,
@@ -24,13 +25,14 @@ export default function HomePage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { config } = useConfig();
+  const router = useRouter();
 
   const footerCustommization = useThemeCustomization("footer");
 
   useEffect(() => {
     if (user) {
       if (user.can_access === false) {
-        window.location.href = "/no-access";
+        void router.push("/no-access");
         return;
       }
       const attemptedUrl = sessionStorage.getItem(
@@ -41,19 +43,18 @@ export default function HomePage() {
         try {
           const url = new URL(attemptedUrl, window.location.origin);
           if (url.origin === window.location.origin) {
-            window.location.href = url.href;
+            void router.push(url.pathname + url.search + url.hash);
           } else {
-            window.location.href = "/calendar";
+            void router.push("/calendar");
           }
         } catch {
-          window.location.href = "/calendar";
+          void router.push("/calendar");
         }
       } else {
-        // Redirect authenticated users to calendar page
-        window.location.href = "/calendar";
+        void router.push("/calendar");
       }
     }
-  }, [user]);
+  }, [user, router]);
 
   useEffect(() => {
     const failure = new URLSearchParams(window.location.search).get(
@@ -118,7 +119,7 @@ export default function HomePage() {
 HomePage.getLayout = function getLayout(page: React.ReactElement) {
   return (
     <div className="calendars__home calendars__home--feedback">
-      <GlobalLayout>
+      <GlobalLayout noRedirect>
         <MainLayout
           enableResize
           hideLeftPanelOnDesktop={true}

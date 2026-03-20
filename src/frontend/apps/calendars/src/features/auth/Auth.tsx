@@ -42,7 +42,7 @@ export const Auth = ({
       return data;
     } catch (error) {
       if (redirect && error instanceof APIError && error.code === 401) {
-        login();
+        login(typeof window !== "undefined" ? window.location.href : undefined);
       } else {
         setUser(null);
       }
@@ -54,11 +54,19 @@ export const Auth = ({
     void init();
   };
 
+  const shouldRedirectNoAccess = redirect && user?.can_access === false;
+
   useEffect(() => {
     void init();
   }, []);
 
-  if (user === undefined) {
+  useEffect(() => {
+    if (shouldRedirectNoAccess) {
+      window.location.href = "/no-access";
+    }
+  }, [shouldRedirectNoAccess]);
+
+  if (user === undefined || shouldRedirectNoAccess) {
     return <SpinnerPage />;
   }
 

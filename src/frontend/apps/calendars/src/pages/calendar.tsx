@@ -2,13 +2,11 @@
  * Calendar page - Main calendar view with sidebar.
  */
 
-import { useEffect } from "react";
-
 import { MainLayout } from "@gouvfr-lasuite/ui-kit";
 import Head from "next/head";
 import { useTranslation } from "next-i18next";
 
-import { login, useAuth } from "@/features/auth/Auth";
+import { useAuth } from "@/features/auth/Auth";
 import { LeftPanel } from "@/features/calendar/components";
 import { GlobalLayout } from "@/features/layouts/components/global/GlobalLayout";
 import {
@@ -16,7 +14,6 @@ import {
   HeaderRight,
 } from "@/features/layouts/components/header/Header";
 import { useLeftPanel } from "@/features/layouts/contexts/LeftPanelContext";
-import { SpinnerPage } from "@/features/ui/components/spinner/SpinnerPage";
 import { Toaster } from "@/features/ui/components/toaster/Toaster";
 import { Scheduler } from "@/features/calendar/components/scheduler/Scheduler";
 import { CalendarContextProvider } from "@/features/calendar/contexts";
@@ -25,17 +22,7 @@ export default function CalendarPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (!user) {
-      login(window.location.href);
-    } else if (user.can_access === false) {
-      window.location.href = "/no-access";
-    }
-  }, [user]);
-
-  if (!user || user.can_access === false) {
-    return <SpinnerPage />;
-  }
+  if (!user) return null;
 
   return (
     <>
