@@ -240,6 +240,16 @@ export type DavRequestOptions = {
   contentType?: string
 }
 
+/** Redirect to login if a response indicates an expired session. */
+function handleAuthError(status: number | undefined) {
+  if (status === 401) {
+    // Dynamic import to avoid circular dependencies
+    import("@/features/api/fetchApi").then(({ redirectToLogin }) =>
+      redirectToLogin(),
+    );
+  }
+}
+
 /** Execute a DAV request with standard error handling */
 export async function executeDavRequest(options: DavRequestOptions): Promise<CalDavResponse> {
   try {
@@ -259,6 +269,7 @@ export async function executeDavRequest(options: DavRequestOptions): Promise<Cal
       });
 
       if (!response.ok && response.status !== 204 && response.status !== 207) {
+        handleAuthError(response.status);
         const errorText = await response.text().catch(() => '');
         console.error(`[CalDAV] ${options.method} request failed:`, {
           url: options.url,
@@ -291,6 +302,7 @@ export async function executeDavRequest(options: DavRequestOptions): Promise<Cal
 
     const response = responses[0]
     if (!response?.ok && response?.status !== 204) {
+      handleAuthError(response?.status);
       return {
         success: false,
         error: `Request failed: ${response?.status}`,
@@ -410,9 +422,13 @@ export async function withErrorHandling<T>(
     const data = await operation()
     return { success: true, data }
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('401')) {
+      handleAuthError(401);
+    }
     return {
       success: false,
-      error: `${errorPrefix}: ${error instanceof Error ? error.message : String(error)}`,
+      error: `${errorPrefix}: ${message}`,
     }
   }
 }

@@ -17,7 +17,7 @@ import icalendar
 import pytest
 
 from core import factories
-from core.api.viewsets_rsvp import RSVPConfirmView, RSVPProcessView
+from core.api.viewsets_rsvp import RSVPConfirmView
 from core.services.caldav_service import CalDAVHTTPClient
 from core.services.calendar_invitation_service import (
     CalendarInvitationService,
@@ -298,12 +298,12 @@ class TestRSVPConfirmView(TestCase):
     APP_URL="http://localhost:8931",
     API_VERSION="v1.0",
 )
-class TestRSVPProcessView(TestCase):
-    """Tests for the RSVPProcessView (POST handler)."""
+class TestRSVPConfirmViewPost(TestCase):
+    """Tests for the RSVPConfirmView POST handler."""
 
     def setUp(self):
         self.factory = RequestFactory()
-        self.view = RSVPProcessView.as_view()
+        self.view = RSVPConfirmView.as_view()
         # RSVP view looks up organizer from DB
         self.organizer = factories.UserFactory(email="alice@example.com")
 
@@ -507,7 +507,7 @@ class TestRSVPEndToEndFlow(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
         self.confirm_view = RSVPConfirmView.as_view()
-        self.process_view = RSVPProcessView.as_view()
+        self.process_view = RSVPConfirmView.as_view()
         self.organizer = factories.UserFactory(email="alice@example.com")
 
     def test_email_to_rsvp_accept_flow(self):
@@ -743,7 +743,7 @@ class TestRSVPRecurringTokenExpiry(TestCase):
 
     def setUp(self):
         self.factory = RequestFactory()
-        self.view = RSVPProcessView.as_view()
+        self.view = RSVPConfirmView.as_view()
         self.organizer = factories.UserFactory(email="alice@example.com")
 
     def _post(self, token, action):

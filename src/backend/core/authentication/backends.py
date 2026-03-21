@@ -11,6 +11,7 @@ from lasuite.oidc_login.backends import (
 
 from core.entitlements import EntitlementsUnavailableError, get_user_entitlements
 from core.models import DuplicateEmailError, Organization
+from core.services.caldav_service import CalDAVClient
 
 logger = logging.getLogger(__name__)
 
@@ -115,3 +116,12 @@ class OIDCAuthenticationBackend(LaSuiteOIDCAuthenticationBackend):
             )
 
         resolve_organization(user, claims, entitlements)
+
+        if settings.CALDAV_URL and entitlements.get("can_access", False):
+            try:
+                CalDAVClient().ensure_default_calendar(user)
+            except Exception:  # pylint: disable=broad-exception-caught
+                logger.exception(
+                    "Failed to assert default calendar for %s",
+                    user.email,
+                )

@@ -63,6 +63,16 @@ class TaskDetailView(APIView):
                     "error": "Task failed",
                 }
             )
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.exception("Failed to fetch result for task %s", task_id)
+            return Response(
+                {
+                    "status": "FAILURE",
+                    "result": None,
+                    "error": "Result backend unavailable",
+                },
+                status=503,
+            )
 
         if result_data is not None:
             resp = {

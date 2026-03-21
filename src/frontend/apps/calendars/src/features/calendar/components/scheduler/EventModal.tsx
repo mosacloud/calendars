@@ -57,7 +57,7 @@ export const EventModal = ({
   const organizer: IcsOrganizer | undefined =
     event?.organizer ||
     (user?.email
-      ? { email: user.email, name: user.email.split("@")[0] }
+      ? { email: user.email, name: user.full_name || user.email.split("@")[0] }
       : undefined);
 
   const form = useEventForm({

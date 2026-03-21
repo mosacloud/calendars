@@ -63,7 +63,7 @@ export const ChannelList = () => {
                 arrow_back
               </span>
             }
-            onClick={() => void router.push("/calendar")}
+            onClick={() => void router.push("/")}
             aria-label={t("app_title")}
           />
           <h2>{t("integrations.title")}</h2>

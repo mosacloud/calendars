@@ -418,11 +418,11 @@ export const useSchedulerHandlers = ({
           throw new Error(createResult.error || "Failed to create new series");
         }
       } else {
-        // 'all' or undefined: update the entire series.
-        // Fetch source to preserve exceptionDates and overrides.
+        // 'all' or undefined: update the entire event/series.
         let eventToUpdate = event;
         let etag = modalState.etag;
 
+        const isRecurring = !!event.recurrenceRule;
         const fetchResult = await caldavService.fetchEvent(modalState.eventUrl);
         if (fetchResult.success && fetchResult.data) {
           const sourceEvents = fetchResult.data.data.events ?? [];
@@ -430,24 +430,32 @@ export const useSchedulerHandlers = ({
             (e) => e.uid === event.uid && !e.recurrenceId,
           );
           if (sourceEvent) {
-            // Merge: keep sourceEvent's date (year/month/day) to preserve DTSTART,
-            // but apply user's time changes (hours/minutes) from the form.
-            const mergedStart = mergeSourceDateWithFormTime(
-              sourceEvent.start,
-              event.start,
-            );
-            const mergedEnd = event.end
-              ? mergeSourceDateWithFormTime(sourceEvent.end!, event.end)
-              : undefined;
+            if (isRecurring) {
+              // Recurring series: keep sourceEvent's date to preserve DTSTART,
+              // but apply user's time changes (hours/minutes) from the form.
+              const mergedStart = mergeSourceDateWithFormTime(
+                sourceEvent.start,
+                event.start,
+              );
+              const mergedEnd = event.end
+                ? mergeSourceDateWithFormTime(sourceEvent.end!, event.end)
+                : undefined;
 
-            eventToUpdate = {
-              ...event,
-              start: mergedStart,
-              end: mergedEnd,
-              duration: sourceEvent.duration,
-              recurrenceId: undefined,
-              exceptionDates: sourceEvent.exceptionDates,
-            } as IcsEvent;
+              eventToUpdate = {
+                ...event,
+                start: mergedStart,
+                end: mergedEnd,
+                duration: sourceEvent.duration,
+                recurrenceId: undefined,
+                exceptionDates: sourceEvent.exceptionDates,
+              } as IcsEvent;
+            } else {
+              // Non-recurring: use form dates directly (user can change date)
+              eventToUpdate = {
+                ...event,
+                duration: sourceEvent.duration,
+              } as IcsEvent;
+            }
           }
           etag = fetchResult.data.etag;
         }

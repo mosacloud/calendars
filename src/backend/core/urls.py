@@ -10,7 +10,7 @@ from core.api import viewsets
 from core.api.viewsets_caldav import CalDAVProxyView, CalDAVSchedulingCallbackView
 from core.api.viewsets_channels import ChannelViewSet
 from core.api.viewsets_ical import ICalExportView
-from core.api.viewsets_rsvp import RSVPConfirmView, RSVPProcessView
+from core.api.viewsets_rsvp import RSVPConfirmView
 from core.api.viewsets_task import TaskDetailView
 from core.external_api import viewsets as external_api_viewsets
 
@@ -38,12 +38,6 @@ urlpatterns = [
                     "caldav-scheduling-callback/",
                     CalDAVSchedulingCallbackView.as_view(),
                     name="caldav-scheduling-callback",
-                ),
-                # RSVP POST endpoint (state-changing, with DRF throttling)
-                path(
-                    "rsvp/",
-                    RSVPProcessView.as_view(),
-                    name="rsvp-process",
                 ),
                 # Task status polling endpoint
                 path(

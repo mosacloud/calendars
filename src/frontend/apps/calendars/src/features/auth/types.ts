@@ -16,6 +16,7 @@ export interface Organization {
 export interface User {
   id: string;
   email: string;
+  full_name?: string;
   language: string;
   can_access: boolean;
   can_admin: boolean;

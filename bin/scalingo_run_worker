@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Parse DATABASE_URL into PG* vars for PHP and psql
+source bin/export_pg_vars.sh
+
+# Start PHP-FPM for SabreDAV (CalDAV server)
+.php/usr/sbin/php-fpm8.3 \
+  -n -c /app/.php/php.ini \
+  --fpm-config /app/sabredav/php-fpm.conf \
+  --nodaemonize &
+
+# Start Caddy for the internal CalDAV FastCGI proxy (port 9001)
+bin/caddy run --config Caddyfile --adapter caddyfile &
+
+# Start the Dramatiq worker
+python worker.py &
+
+# if the current shell is killed, also terminate all its children
+trap "pkill -SIGTERM -P $$" SIGTERM
+
+# wait for a single child to finish,
+wait -n
+# then kill all the other tasks
+pkill -P $$

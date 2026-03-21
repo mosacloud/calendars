@@ -23,6 +23,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.core.signing import TimestampSigner
 from django.template.loader import render_to_string
 
+from core.models import User
 from core.services.translation_service import TranslationService
 
 logger = logging.getLogger(__name__)
@@ -215,12 +216,16 @@ class ICalendarParser:
             )
             organizer_email = ""
             if organizer_value:
-                organizer_email = organizer_value.replace("mailto:", "").strip()
+                organizer_email = re.sub(
+                    r"^mailto:", "", organizer_value, flags=re.IGNORECASE
+                ).strip()
             organizer_name = organizer_params.get("CN")
 
             # Extract attendee info for the recipient from VEVENT block
             # Find the ATTENDEE line that matches the recipient
-            recipient_clean = recipient_email.replace("mailto:", "").lower()
+            recipient_clean = re.sub(
+                r"^mailto:", "", recipient_email, flags=re.IGNORECASE
+            ).lower()
             attendee_name = None
 
             # Look for ATTENDEE lines in VEVENT block
@@ -399,8 +404,29 @@ class CalendarInvitationService:  # pylint: disable=too-many-instance-attributes
             )
             time_str = f"{start_time} - {end_time}" if end_time else start_time
 
-        organizer_display = event.organizer_name or event.organizer_email
-        attendee_display = event.attendee_name or event.attendee_email
+        organizer_name = event.organizer_name
+        if not organizer_name and event.organizer_email:
+            try:
+                organizer_user = User.objects.get(email=event.organizer_email)
+                organizer_name = organizer_user.full_name
+            except User.DoesNotExist:
+                pass
+        if organizer_name and event.organizer_email:
+            organizer_display = f"{organizer_name} ({event.organizer_email})"
+        else:
+            organizer_display = event.organizer_email or organizer_name or ""
+
+        attendee_name = event.attendee_name
+        if not attendee_name and event.attendee_email:
+            try:
+                attendee_user = User.objects.get(email=event.attendee_email)
+                attendee_name = attendee_user.full_name
+            except User.DoesNotExist:
+                pass
+        if attendee_name and event.attendee_email:
+            attendee_display = f"{attendee_name} ({event.attendee_email})"
+        else:
+            attendee_display = event.attendee_email or attendee_name or ""
 
         # Determine email type key for content lookups
         if method == self.METHOD_CANCEL:

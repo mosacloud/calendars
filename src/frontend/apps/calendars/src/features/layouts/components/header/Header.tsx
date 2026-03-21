@@ -22,12 +22,12 @@ export const HeaderIcon = () => {
   return (
     <div className="calendars__header__left">
       <div
-        onClick={() => void router.push("/calendar")}
+        onClick={() => void router.push("/")}
         style={{ cursor: "pointer" }}
         role="link"
         tabIndex={0}
         onKeyDown={(e) => {
-          if (e.key === "Enter") void router.push("/calendar");
+          if (e.key === "Enter") void router.push("/");
         }}
       >
         <DynamicCalendarLogo variant="header" />

@@ -525,6 +525,14 @@ class CalDAVClient:
             user, calendar_name, calendar_id, color=settings.DEFAULT_CALENDAR_COLOR
         )
 
+    def ensure_default_calendar(self, user) -> None:
+        """Ensure the user has at least one calendar, creating one if needed."""
+        client = self._get_client(user)
+        principal = client.principal()
+        if not principal.calendars():
+            self.create_default_calendar(user)
+            logger.info("Auto-created default calendar for user %s", user.email)
+
     def _parse_event(self, event) -> Optional[dict]:
         """
         Parse a caldav Event object and return event data as dictionary.

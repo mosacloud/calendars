@@ -434,7 +434,7 @@ def test_signal_creates_calendar_when_entitled():
         mock.patch("core.signals.CalendarService") as mock_svc,
     ):
         factories.UserFactory()
-        mock_svc.return_value.create_default_calendar.assert_called_once()
+        mock_svc.return_value.ensure_default_calendar.assert_called_once()
 
     get_entitlements_backend.cache_clear()
 

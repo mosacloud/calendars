@@ -27,6 +27,7 @@
 @use "./../features/calendar/components/scheduler/mobile/FloatingActionButton";
 @use "./../features/calendar/components/scheduler/mobile/MobileListView";
 @use "./../features/resources/components/Resources";
+@use "./../features/integrations/components/Integrations";
 @use "./../features/settings/components/WorkingHoursSettings";
 @use "./../pages/index" as *;
 @use "./../pages/calendar" as *;

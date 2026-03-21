@@ -23,6 +23,9 @@ use Calendars\SabreDav\CalendarsRoot;
 use Calendars\SabreDav\CustomCalDAVPlugin;
 use Calendars\SabreDav\PrincipalsRoot;
 
+// Allow large ICS imports (default 128M is too low for big calendars)
+ini_set('memory_limit', getenv('PHP_MEMORY_LIMIT') ?: '512M');
+
 // Composer autoloader
 require_once __DIR__ . '/vendor/autoload.php';
 

@@ -19,9 +19,6 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
-from rest_framework.throttling import AnonRateThrottle
-from rest_framework.views import APIView
-
 from core.models import User
 from core.services.caldav_service import CalDAVHTTPClient
 from core.services.translation_service import TranslationService
@@ -151,14 +148,16 @@ def _validate_and_render_error(request, token, action, lang):
 
 @method_decorator(csrf_exempt, name="dispatch")
 class RSVPConfirmView(View):
-    """GET handler: render auto-submitting confirmation page.
+    """GET: render auto-submitting confirmation page.
+    POST: noscript fallback that processes the RSVP directly.
 
-    This page is safe for link previewers / prefetchers because it
-    doesn't change any state — only the POST endpoint does.
+    GET is safe for link previewers / prefetchers because it
+    doesn't change any state. JS auto-submits via fetch() to the
+    API endpoint; the noscript form falls back to POST here.
     """
 
     def get(self, request):
-        """Render a page that auto-submits the RSVP via POST."""
+        """Render a page that auto-submits the RSVP via fetch()."""
         token = request.GET.get("token", "")
         action = request.GET.get("action", "")
         lang = TranslationService.resolve_language(request=request)
@@ -181,15 +180,12 @@ class RSVPConfirmView(View):
                 "status_icon": PARTSTAT_ICONS[action],
                 "header_color": PARTSTAT_COLORS[action],
                 "submit_label": label,
-                "post_url": f"/api/{settings.API_VERSION}/rsvp/",
             },
         )
 
-
-class RSVPThrottle(AnonRateThrottle):
-    """Throttle RSVP POST requests: 30/min per IP."""
-
-    rate = "30/minute"
+    def post(self, request):
+        """Noscript fallback: process RSVP and render result page."""
+        return _rsvp_post(request)
 
 
 def _process_rsvp(request, payload, action, lang):
@@ -225,53 +221,42 @@ def _process_rsvp(request, payload, action, lang):
     return calendar_data
 
 
-class RSVPProcessView(APIView):
-    """POST handler: actually process the RSVP.
+def _rsvp_post(request):
+    """Shared RSVP POST logic for both the API and noscript fallback."""
+    # Support both DRF's request.data and Django's request.POST
+    data = getattr(request, "data", None) or request.POST
+    token = data.get("token", "")
+    action = data.get("action", "")
+    lang = TranslationService.resolve_language(request=request)
+    t = TranslationService.t
 
-    Uses DRF's AnonRateThrottle for rate limiting. No authentication
-    required — the signed token acts as authorization.
-    """
+    payload, error_response = _validate_and_render_error(request, token, action, lang)
+    if error_response:
+        return error_response
 
-    authentication_classes = []
-    permission_classes = []
-    throttle_classes = [RSVPThrottle]
+    result = _process_rsvp(request, payload, action, lang)
 
-    def post(self, request):
-        """Process the RSVP response."""
-        token = request.data.get("token", "")
-        action = request.data.get("action", "")
-        lang = TranslationService.resolve_language(request=request)
-        t = TranslationService.t
+    # result is either an error HttpResponse or calendar data string
+    if not isinstance(result, str):
+        return result
 
-        payload, error_response = _validate_and_render_error(
-            request, token, action, lang
-        )
-        if error_response:
-            return error_response
+    from core.services.calendar_invitation_service import (  # noqa: PLC0415  # pylint: disable=import-outside-toplevel
+        ICalendarParser,
+    )
 
-        result = _process_rsvp(request, payload, action, lang)
+    summary = ICalendarParser.extract_property(result, "SUMMARY") or ""
+    label = t(f"rsvp.{action}", lang)
 
-        # result is either an error HttpResponse or calendar data string
-        if not isinstance(result, str):
-            return result
-
-        from core.services.calendar_invitation_service import (  # noqa: PLC0415  # pylint: disable=import-outside-toplevel
-            ICalendarParser,
-        )
-
-        summary = ICalendarParser.extract_property(result, "SUMMARY") or ""
-        label = t(f"rsvp.{action}", lang)
-
-        return render(
-            request,
-            "rsvp/response.html",
-            {
-                "page_title": label,
-                "heading": label,
-                "message": t("rsvp.responseSent", lang),
-                "status_icon": PARTSTAT_ICONS[action],
-                "header_color": PARTSTAT_COLORS[action],
-                "event_summary": summary,
-                "lang": lang,
-            },
-        )
+    return render(
+        request,
+        "rsvp/response.html",
+        {
+            "page_title": label,
+            "heading": label,
+            "message": t("rsvp.responseSent", lang),
+            "status_icon": PARTSTAT_ICONS[action],
+            "header_color": PARTSTAT_COLORS[action],
+            "event_summary": summary,
+            "lang": lang,
+        },
+    )

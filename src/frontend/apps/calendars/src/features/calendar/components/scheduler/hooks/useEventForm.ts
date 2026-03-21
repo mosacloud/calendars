@@ -47,7 +47,7 @@ export const useEventForm = ({
   // Stash full datetime strings so toggling all-day off restores the original times
   const savedDateTimesRef = useRef({ start: "", end: "" });
   const [selectedCalendarUrl, setSelectedCalendarUrl] = useState(calendarUrl);
-  const [isAllDay, setIsAllDay] = useState(false);
+  const [isAllDay, setIsAllDay] = useState(event?.start?.type === "DATE");
   const [attendees, setAttendees] = useState<IcsAttendee[]>([]);
   const [resources, setResources] = useState<ResourcePrincipal[]>([]);
   const [recurrence, setRecurrence] = useState<IcsRecurrenceRule | undefined>(

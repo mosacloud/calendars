@@ -17,6 +17,18 @@ function getCSRFToken() {
 export const SESSION_STORAGE_REDIRECT_AFTER_LOGIN_URL =
   "redirect_after_login_url";
 
+/**
+ * Redirect to the login page, saving the current URL for post-login redirect.
+ * Called on any 401 response to handle expired sessions.
+ */
+export function redirectToLogin() {
+  sessionStorage.setItem(
+    SESSION_STORAGE_REDIRECT_AFTER_LOGIN_URL,
+    window.location.href,
+  );
+  window.location.replace(new URL("authenticate/", baseApiUrl()).href);
+}
+
 export type fetchAPIOptions = Record<string, never>;
 
 export const fetchAPI = async (

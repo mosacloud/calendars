@@ -68,7 +68,7 @@ export const ResourceList = ({
             color="neutral"
             size="small"
             icon={<span className="material-icons">arrow_back</span>}
-            onClick={() => void router.push("/calendar")}
+            onClick={() => void router.push("/")}
             aria-label={t("app_title")}
           />
           <h2>{t("resources.title")}</h2>
