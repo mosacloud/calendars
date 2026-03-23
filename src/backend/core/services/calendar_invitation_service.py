@@ -376,57 +376,74 @@ class CalendarInvitationService:  # pylint: disable=too-many-instance-attributes
             )
             return False
 
-    def _build_template_context(  # pylint: disable=too-many-locals
+    @staticmethod
+    def _format_event_dates(event: "EventDetails", lang: str) -> tuple:
+        """Return (start_str, end_str, time_str) for the given event."""
+        t = TranslationService.t
+        start_str = TranslationService.format_date(event.dtstart, lang)
+        end_str = (
+            TranslationService.format_date(event.dtend, lang)
+            if event.dtend
+            else start_str
+        )
+        if event.is_all_day:
+            return start_str, end_str, t("email.allDay", lang)
+
+        start_time = event.dtstart.strftime("%H:%M")
+        end_time = event.dtend.strftime("%H:%M") if event.dtend else ""
+        time_str = f"{start_time} - {end_time}" if end_time else start_time
+        return start_str, end_str, time_str
+
+    @staticmethod
+    def _resolve_display_name(name: Optional[str], email: Optional[str]) -> str:
+        """Resolve a display string like 'Name (email)' from name/email."""
+        if not name and email:
+            try:
+                name = User.objects.get(email=email).full_name
+            except User.DoesNotExist:
+                pass
+        if name and email:
+            return f"{name} ({email})"
+        return email or name or ""
+
+    def _build_rsvp_context(self, event: "EventDetails") -> dict:
+        """Build RSVP link context entries for REQUEST-method emails."""
+        signer = TimestampSigner(salt="rsvp")
+        organizer = re.sub(r"^mailto:", "", event.organizer_email, flags=re.IGNORECASE)
+        token = signer.sign_object(
+            {
+                "uid": event.uid,
+                "email": event.attendee_email,
+                "organizer": organizer,
+            }
+        )
+        base = f"{settings.APP_URL}/rsvp/"
+        partstat = {
+            "accept": "accepted",
+            "tentative": "tentative",
+            "decline": "declined",
+        }
+        return {
+            f"rsvp_{action}_url": (
+                f"{base}?{urlencode({'token': token, 'action': partstat[action]})}"
+            )
+            for action in ("accept", "tentative", "decline")
+        }
+
+    def _build_template_context(
         self, event: EventDetails, method: str, lang: str = "fr"
     ) -> dict:
         """Build context dictionary for email templates."""
         t = TranslationService.t
         summary = event.summary or t("email.noTitle", lang)
+        start_str, end_str, time_str = self._format_event_dates(event, lang)
 
-        # Format dates for display
-        if event.is_all_day:
-            start_str = TranslationService.format_date(event.dtstart, lang)
-            end_str = (
-                TranslationService.format_date(event.dtend, lang)
-                if event.dtend
-                else start_str
-            )
-            time_str = t("email.allDay", lang)
-        else:
-            time_format = "%H:%M"
-            start_str = TranslationService.format_date(event.dtstart, lang)
-            start_time = event.dtstart.strftime(time_format)
-            end_time = event.dtend.strftime(time_format) if event.dtend else ""
-            end_str = (
-                TranslationService.format_date(event.dtend, lang)
-                if event.dtend
-                else start_str
-            )
-            time_str = f"{start_time} - {end_time}" if end_time else start_time
-
-        organizer_name = event.organizer_name
-        if not organizer_name and event.organizer_email:
-            try:
-                organizer_user = User.objects.get(email=event.organizer_email)
-                organizer_name = organizer_user.full_name
-            except User.DoesNotExist:
-                pass
-        if organizer_name and event.organizer_email:
-            organizer_display = f"{organizer_name} ({event.organizer_email})"
-        else:
-            organizer_display = event.organizer_email or organizer_name or ""
-
-        attendee_name = event.attendee_name
-        if not attendee_name and event.attendee_email:
-            try:
-                attendee_user = User.objects.get(email=event.attendee_email)
-                attendee_name = attendee_user.full_name
-            except User.DoesNotExist:
-                pass
-        if attendee_name and event.attendee_email:
-            attendee_display = f"{attendee_name} ({event.attendee_email})"
-        else:
-            attendee_display = event.attendee_email or attendee_name or ""
+        organizer_display = self._resolve_display_name(
+            event.organizer_name, event.organizer_email
+        )
+        attendee_display = self._resolve_display_name(
+            event.attendee_name, event.attendee_email
+        )
 
         # Determine email type key for content lookups
         if method == self.METHOD_CANCEL:
@@ -489,29 +506,7 @@ class CalendarInvitationService:  # pylint: disable=too-many-instance-attributes
 
         # Add RSVP links for REQUEST method (invitations and updates)
         if method == self.METHOD_REQUEST:
-            signer = TimestampSigner(salt="rsvp")
-            # Strip mailto: prefix (case-insensitive) for shorter tokens
-            organizer = re.sub(
-                r"^mailto:", "", event.organizer_email, flags=re.IGNORECASE
-            )
-            token = signer.sign_object(
-                {
-                    "uid": event.uid,
-                    "email": event.attendee_email,
-                    "organizer": organizer,
-                }
-            )
-            app_url = settings.APP_URL
-            base = f"{app_url}/rsvp/"
-            for action in ("accept", "tentative", "decline"):
-                partstat = {
-                    "accept": "accepted",
-                    "tentative": "tentative",
-                    "decline": "declined",
-                }
-                context[f"rsvp_{action}_url"] = (
-                    f"{base}?{urlencode({'token': token, 'action': partstat[action]})}"
-                )
+            context.update(self._build_rsvp_context(event))
 
         return context
 
