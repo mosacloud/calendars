@@ -189,6 +189,34 @@ class CalendarSanitizerPlugin extends ServerPlugin
                 }
             }
 
+            // Cap unbounded RRULEs: add UNTIL if neither COUNT nor UNTIL is set.
+            // Prevents infinite recurrence expansion. Default: 10 years from DTSTART.
+            if (isset($component->RRULE)) {
+                foreach ($component->select('RRULE') as $rrule) {
+                    $rruleStr = (string)$rrule;
+                    $hasCount = stripos($rruleStr, 'COUNT=') !== false;
+                    $hasUntil = stripos($rruleStr, 'UNTIL=') !== false;
+
+                    if (!$hasCount && !$hasUntil && isset($component->DTSTART)) {
+                        // Calculate UNTIL as 10 years from DTSTART, preserving date type.
+                        // All-day events (VALUE=DATE) need date-only UNTIL (Ymd),
+                        // timed events need date-time UNTIL matching DTSTART format.
+                        $dtstart = $component->DTSTART;
+                        $until = $dtstart->getDateTime()->modify('+10 years');
+                        $valueParam = $dtstart->offsetGet('VALUE');
+                        $isDateOnly = $valueParam && strtoupper((string)$valueParam) === 'DATE';
+
+                        if ($isDateOnly) {
+                            $untilStr = $until->format('Ymd');
+                        } else {
+                            $untilStr = $until->format('Ymd\THis\Z');
+                        }
+                        $rrule->setValue($rruleStr . ';UNTIL=' . $untilStr);
+                        $wasModified = true;
+                    }
+                }
+            }
+
             // Truncate oversized short text properties (SUMMARY, LOCATION)
             foreach (self::SHORT_TEXT_PROPERTIES as $prop) {
                 if (isset($component->{$prop})) {
