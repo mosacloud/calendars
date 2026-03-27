@@ -14,7 +14,7 @@ import { LeftPanel } from "@/features/calendar/components";
 import { useLeftPanel } from "@/features/layouts/contexts/LeftPanelContext";
 import { CalendarContextProvider } from "@/features/calendar/contexts";
 import { Scheduler } from "@/features/calendar/components/scheduler/Scheduler";
-import { HomePage } from "@/features/home/HomePage";
+import { MosaLoginPage } from "@/features/home/components/MosaLoginPage";
 import { SESSION_STORAGE_REDIRECT_AFTER_LOGIN_URL } from "@/features/api/fetchApi";
 import { SpinnerPage } from "@/features/ui/components/spinner/SpinnerPage";
 
@@ -98,7 +98,7 @@ function AnonymousView() {
           />
           <link rel="icon" href="/favicon.png" />
         </Head>
-        <HomePage />
+        <MosaLoginPage />
         <Toaster />
       </MainLayout>
     </div>
