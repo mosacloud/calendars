@@ -1,31 +1,18 @@
 import { GlobalLayout } from "@/features/layouts/components/global/GlobalLayout";
-import Head from "next/head";
 import { useTranslation } from "next-i18next";
-import { Hero, Footer, MainLayout, HomeGutter } from "@gouvfr-lasuite/ui-kit";
-import { login, useAuth } from "@/features/auth/Auth";
+import { useAuth } from "@/features/auth/Auth";
 import { useEffect } from "react";
-import banner from "@/assets/home/banner.svg";
-import {
-  HeaderIcon,
-  HeaderRight,
-} from "@/features/layouts/components/header/Header";
 import {
   addToast,
   Toaster,
   ToasterItem,
 } from "@/features/ui/components/toaster/Toaster";
-import { Button } from "@gouvfr-lasuite/cunningham-react";
-import { useConfig } from "@/features/config/ConfigProvider";
-import { LeftPanelMobile } from "@/features/layouts/components/left-panel/LeftPanelMobile";
 import { SESSION_STORAGE_REDIRECT_AFTER_LOGIN_URL } from "@/features/api/fetchApi";
-import { useThemeCustomization } from "@/hooks/useThemeCustomization";
-import { DynamicCalendarLogo } from "@/features/ui/components/logo";
+import { MosaLoginPage } from "@/features/home/components/MosaLoginPage";
+
 export default function HomePage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { config } = useConfig();
-
-  const footerCustommization = useThemeCustomization("footer");
 
   useEffect(() => {
     if (user) {
@@ -49,7 +36,6 @@ export default function HomePage() {
           window.location.href = "/calendar";
         }
       } else {
-        // Redirect authenticated users to calendar page
         window.location.href = "/calendar";
       }
     }
@@ -75,61 +61,12 @@ export default function HomePage() {
 
   return (
     <>
-      <Head>
-        <title>{t("app_title")}</title>
-        <meta name="description" content={t("app_description")} />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.png" />
-      </Head>
-
-      <HomeGutter>
-        <Hero
-          logo={<DynamicCalendarLogo variant="icon" />}
-          banner={banner.src}
-          title={t("home.title")}
-          subtitle={t("home.subtitle")}
-          mainButton={
-            <div className="c__hero__buttons">
-              <div>
-                <Button onClick={() => login()} fullWidth>
-                  {t("home.main_button")}
-                </Button>
-              </div>
-
-              <div>
-                <Button
-                  variant="bordered"
-                  fullWidth
-                  href={config?.FRONTEND_MORE_LINK}
-                  target="_blank"
-                >
-                  {t("home.more")}
-                </Button>
-              </div>
-            </div>
-          }
-        />
-      </HomeGutter>
-      <Footer {...footerCustommization} />
+      <MosaLoginPage />
+      <Toaster />
     </>
   );
 }
 
 HomePage.getLayout = function getLayout(page: React.ReactElement) {
-  return (
-    <div className="calendars__home calendars__home--feedback">
-      <GlobalLayout>
-        <MainLayout
-          enableResize
-          hideLeftPanelOnDesktop={true}
-          leftPanelContent={<LeftPanelMobile />}
-          icon={<HeaderIcon />}
-          rightHeaderContent={<HeaderRight />}
-        >
-          {page}
-          <Toaster />
-        </MainLayout>
-      </GlobalLayout>
-    </div>
-  );
+  return <GlobalLayout>{page}</GlobalLayout>;
 };

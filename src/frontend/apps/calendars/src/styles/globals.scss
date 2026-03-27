@@ -28,6 +28,7 @@
 @use "./../features/calendar/components/scheduler/mobile/MobileListView";
 @use "./../features/resources/components/Resources";
 @use "./../features/settings/components/WorkingHoursSettings";
+@use "./../features/home/components/MosaLoginPage/MosaLoginPage.scss";
 @use "./../pages/index" as *;
 @use "./../pages/calendar" as *;
 html,
