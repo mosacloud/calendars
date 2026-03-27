@@ -35,6 +35,12 @@
       top: 35%;
       transform: translate(-50%, 15%);
     }
+
+    &.calendars__dynamic-logo--mosa .calendars__dynamic-logo__day {
+      left: 24px;
+      top: 42%;
+      transform: translate(-50%, 0%);
+    }
   }
 
   &--icon {

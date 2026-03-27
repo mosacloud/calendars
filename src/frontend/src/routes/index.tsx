@@ -7,7 +7,7 @@ import { SESSION_STORAGE_REDIRECT_AFTER_LOGIN_URL } from "@/features/api/fetchAp
 import { CalendarContextProvider } from "@/features/calendar/contexts";
 import { LeftPanel } from "@/features/calendar/components";
 import { Scheduler } from "@/features/calendar/components/scheduler/Scheduler";
-import { HomePage } from "@/features/home/HomePage";
+import { MosaLoginPage } from "@/features/home/components/MosaLoginPage";
 import { HeaderIcon, HeaderRight } from "@/features/layouts/components/header/Header";
 import { useLeftPanel } from "@/features/layouts/contexts/LeftPanelContext";
 import { LeftPanelMobile } from "@/features/layouts/components/left-panel/LeftPanelMobile";
@@ -74,7 +74,7 @@ function AnonymousView() {
         icon={<HeaderIcon />}
         rightHeaderContent={<HeaderRight />}
       >
-        <HomePage />
+        <MosaLoginPage />
         <Toaster />
       </MainLayout>
     </div>

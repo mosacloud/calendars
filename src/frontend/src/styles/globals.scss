@@ -39,6 +39,7 @@
 @use "./../features/resources/components/Resources";
 @use "./../features/integrations/components/Integrations";
 @use "./../features/settings/components/WorkingHoursSettings";
+@use "./../features/home/components/MosaLoginPage/MosaLoginPage.scss";
 @use "./views/index" as *;
 @use "./views/calendar" as *;
 html,

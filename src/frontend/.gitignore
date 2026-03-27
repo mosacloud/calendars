@@ -45,3 +45,5 @@ yarn-error.log*
 
 # generated route tree
 src/routes.gen.ts
+
+certificates

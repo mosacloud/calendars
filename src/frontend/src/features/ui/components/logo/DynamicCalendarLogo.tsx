@@ -2,17 +2,30 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useAppContext } from "@/features/app/AppContext";
 
 interface DynamicCalendarLogoProps {
   variant?: "header" | "icon";
   className?: string;
 }
 
+const ASSETS: Record<string, { icon: string; header: string }> = {
+  default: {
+    icon: "/cal_icon_no_number.svg",
+    header: "/cal_logotype_text_no_number.svg",
+  },
+  mosa: {
+    icon: "/cal_icon_no_number_mosa.svg",
+    header: "/cal_logotype_text_no_number_mosa.svg",
+  },
+};
+
 export const DynamicCalendarLogo = ({
   variant = "header",
   className,
 }: DynamicCalendarLogoProps) => {
   const { t } = useTranslation();
+  const { theme } = useAppContext();
   const [day, setDay] = useState<number | null>(null);
 
   useEffect(() => {
@@ -21,13 +34,14 @@ export const DynamicCalendarLogo = ({
 
   const isIcon = variant === "icon";
   const isDoubleDigit = day !== null && day >= 10;
+  const assets = ASSETS[theme] ?? ASSETS.default;
 
   return (
     <div
-      className={`calendars__dynamic-logo ${isIcon ? "calendars__dynamic-logo--icon" : "calendars__dynamic-logo--header"} ${className ?? ""}`}
+      className={`calendars__dynamic-logo ${isIcon ? "calendars__dynamic-logo--icon" : "calendars__dynamic-logo--header"} ${theme === "mosa" ? "calendars__dynamic-logo--mosa" : ""} ${className ?? ""}`}
     >
       <img
-        src={isIcon ? "/cal_icon_no_number.svg" : "/cal_logotype_text_no_number.svg"}
+        src={isIcon ? assets.icon : assets.header}
         alt={t("app_title")}
         className="calendars__dynamic-logo__img"
       />
