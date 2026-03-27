@@ -57,7 +57,8 @@ CALDAV_OUTBOUND_API_KEY=changeme-outbound-in-production
 CALDAV_INBOUND_API_KEY=changeme-inbound-in-production
 CALDAV_INTERNAL_API_KEY=changeme-internal-in-production
 # Frontend
-FRONTEND_THEME=default
+FRONTEND_THEME=mosa
+FRONTEND_HIDE_GAUFRE=True
 FRONTEND_MORE_LINK=
 FRONTEND_FEEDBACK_BUTTON_SHOW=True
 FRONTEND_FEEDBACK_BUTTON_IDLE=False
