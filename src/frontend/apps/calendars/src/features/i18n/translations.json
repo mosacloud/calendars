@@ -22,7 +22,7 @@
         "success": "Copied to clipboard",
         "error": "Failed to copy to clipboard"
       },
-      "app_title": "Calendars",
+      "app_title": "Calendar",
       "app_description": "Calendars application",
       "welcome": "Welcome",
       "logout": "Logout",
@@ -60,6 +60,18 @@
         "subtitle": "A modern, open-source calendar application. Create events, invite attendees, share calendars with your team, and sync across all your devices.",
         "main_button": "Sign in",
         "more": "Learn more"
+      },
+      "mosa": {
+        "login": {
+          "page_title": "Sign in to Calendar - mosa.cloud",
+          "tagline": "Collaborate without compromise",
+          "welcome_to": "Welcome to",
+          "product_description": "Plan together, stay in sync",
+          "sign_in_button": "Sign in with your account",
+          "no_account": "Don't have an account?",
+          "contact_us": "Contact us",
+          "built_in_eu": "Built in the EU"
+        }
       },
       "feedback": {
         "button": "Give feedback",
@@ -621,7 +633,7 @@
         "success": "Copié dans le presse-papiers",
         "error": "Échec de la copie dans le presse-papiers"
       },
-      "app_title": "Calendriers",
+      "app_title": "Calendar",
       "app_description": "Application de calendriers",
       "welcome": "Bienvenue",
       "logout": "Déconnexion",
@@ -659,6 +671,18 @@
         "subtitle": "Une application de calendrier moderne et open source. Créez des événements, invitez des participants, partagez vos calendriers avec votre équipe et synchronisez sur tous vos appareils.",
         "main_button": "Se connecter",
         "more": "En savoir plus"
+      },
+      "mosa": {
+        "login": {
+          "page_title": "Connexion à Calendar - mosa.cloud",
+          "tagline": "Collaborez sans compromis",
+          "welcome_to": "Bienvenue sur",
+          "product_description": "Planifiez ensemble, restez synchronisés",
+          "sign_in_button": "Se connecter avec votre compte",
+          "no_account": "Pas encore de compte ?",
+          "contact_us": "Contactez-nous",
+          "built_in_eu": "Conçu dans l'UE"
+        }
       },
       "feedback": {
         "button": "Faire un retour",
@@ -1479,7 +1503,7 @@
         "success": "Gekopieërd naar klembord",
         "error": "Kopiëren naar klembord mislukt"
       },
-      "app_title": "Calendars",
+      "app_title": "Calendar",
       "app_description": "Kalenderbeheer",
       "welcome": "Welkom",
       "logout": "Uitloggen",
@@ -1517,6 +1541,18 @@
         "subtitle": "Een moderne, open-source kalenderapplicatie. Maak evenementen, nodig deelnemers uit, deel kalenders met je team en synchroniseer op al je apparaten.",
         "main_button": "Inloggen",
         "more": "Meer informatie"
+      },
+      "mosa": {
+        "login": {
+          "page_title": "Inloggen bij Calendar - mosa.cloud",
+          "tagline": "Samenwerken zonder compromis",
+          "welcome_to": "Welkom bij",
+          "product_description": "Plan samen, blijf gesynchroniseerd",
+          "sign_in_button": "Inloggen met je account",
+          "no_account": "Nog geen account?",
+          "contact_us": "Neem contact op",
+          "built_in_eu": "Gemaakt in de EU"
+        }
       },
       "feedback": {
         "button": "Geef feedback",
