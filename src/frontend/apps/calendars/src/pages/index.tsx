@@ -9,7 +9,6 @@ import {
   HeaderRight,
 } from "@/features/layouts/components/header/Header";
 import { Toaster } from "@/features/ui/components/toaster/Toaster";
-import { LeftPanelMobile } from "@/features/layouts/components/left-panel/LeftPanelMobile";
 import { LeftPanel } from "@/features/calendar/components";
 import { useLeftPanel } from "@/features/layouts/contexts/LeftPanelContext";
 import { CalendarContextProvider } from "@/features/calendar/contexts";
@@ -78,30 +77,11 @@ function AuthenticatedView() {
 }
 
 function AnonymousView() {
-  const { t } = useTranslation();
-
   return (
-    <div className="calendars__home calendars__home--feedback">
-      <MainLayout
-        enableResize
-        hideLeftPanelOnDesktop={true}
-        leftPanelContent={<LeftPanelMobile />}
-        icon={<HeaderIcon />}
-        rightHeaderContent={<HeaderRight />}
-      >
-        <Head>
-          <title>{t("app_title")}</title>
-          <meta name="description" content={t("app_description")} />
-          <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1"
-          />
-          <link rel="icon" href="/favicon.png" />
-        </Head>
-        <MosaLoginPage />
-        <Toaster />
-      </MainLayout>
-    </div>
+    <>
+      <MosaLoginPage />
+      <Toaster />
+    </>
   );
 }
 
