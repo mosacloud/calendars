@@ -10,7 +10,6 @@ import { Scheduler } from "@/features/calendar/components/scheduler/Scheduler";
 import { MosaLoginPage } from "@/features/home/components/MosaLoginPage";
 import { HeaderIcon, HeaderRight } from "@/features/layouts/components/header/Header";
 import { useLeftPanel } from "@/features/layouts/contexts/LeftPanelContext";
-import { LeftPanelMobile } from "@/features/layouts/components/left-panel/LeftPanelMobile";
 import { MailboxContextProvider } from "@/features/mailbox/MailboxContext";
 import { SpinnerPage } from "@/features/ui/components/spinner/SpinnerPage";
 import { Toaster } from "@/features/ui/components/toaster/Toaster";
@@ -66,18 +65,10 @@ function AuthenticatedView() {
 
 function AnonymousView() {
   return (
-    <div className="calendars__home calendars__home--feedback">
-      <MainLayout
-        enableResize
-        hideLeftPanelOnDesktop={true}
-        leftPanelContent={<LeftPanelMobile />}
-        icon={<HeaderIcon />}
-        rightHeaderContent={<HeaderRight />}
-      >
-        <MosaLoginPage />
-        <Toaster />
-      </MainLayout>
-    </div>
+    <>
+      <MosaLoginPage />
+      <Toaster />
+    </>
   );
 }
 
