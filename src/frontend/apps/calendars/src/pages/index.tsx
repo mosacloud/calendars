@@ -12,6 +12,7 @@ import { Toaster } from "@/features/ui/components/toaster/Toaster";
 import { LeftPanel } from "@/features/calendar/components";
 import { useLeftPanel } from "@/features/layouts/contexts/LeftPanelContext";
 import { CalendarContextProvider } from "@/features/calendar/contexts";
+import { MailboxContextProvider } from "@/features/mailbox/MailboxContext";
 import { Scheduler } from "@/features/calendar/components/scheduler/Scheduler";
 import { MosaLoginPage } from "@/features/home/components/MosaLoginPage";
 import { SESSION_STORAGE_REDIRECT_AFTER_LOGIN_URL } from "@/features/api/fetchApi";
@@ -45,6 +46,7 @@ function AuthenticatedView() {
   }, [user, router]);
 
   return (
+    <MailboxContextProvider>
     <CalendarContextProvider>
       <div className="calendars__calendar">
         <MainLayout
@@ -73,6 +75,7 @@ function AuthenticatedView() {
         </MainLayout>
       </div>
     </CalendarContextProvider>
+    </MailboxContextProvider>
   );
 }
 

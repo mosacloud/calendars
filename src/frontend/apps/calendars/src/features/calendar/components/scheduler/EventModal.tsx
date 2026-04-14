@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { IcsEvent, IcsOrganizer } from "ts-ics";
 import {
@@ -27,6 +27,7 @@ import { SectionPills } from "./event-modal-sections/SectionPills";
 import { useResourcePrincipals } from "@/features/resources/api/useResourcePrincipals";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useConfig } from "@/features/config/ConfigProvider";
+import { FeatureFlag, useFeatureFlag } from "@/hooks/useFeatureFlag";
 import type {
   EventModalProps,
   RecurringDeleteOption,
@@ -55,20 +56,66 @@ export const EventModal = ({
 
   const { resources: availableResources } = useResourcePrincipals();
 
-  const organizer: IcsOrganizer | undefined =
+  // Initial organizer from the prop-level calendarUrl — used only
+  // for the form reset effect (useEventForm) so that switching the
+  // dropdown doesn't wipe the form.
+  const initialMailboxEmail = calendarUrl
+    ? calendars.find((c) => c.url === calendarUrl)?.mailboxEmail
+    : undefined;
+
+  const initialOrganizer: IcsOrganizer | undefined =
     event?.organizer ||
-    (user?.email
-      ? { email: user.email, name: user.full_name || user.email.split("@")[0] }
-      : undefined);
+    (initialMailboxEmail
+      ? { email: initialMailboxEmail, name: initialMailboxEmail.split("@")[0] }
+      : user?.email
+        ? { email: user.email, name: user.full_name || user.email.split("@")[0] }
+        : undefined);
 
   const form = useEventForm({
     event,
     calendarUrl,
     adapter,
-    organizer,
+    organizer: initialOrganizer,
     mode,
     availableResources,
   });
+
+  // Organizer that tracks the *currently selected* calendar in the
+  // dropdown — this is what gets written into the ICS on save and
+  // shown in the attendees section.  When the user switches from a
+  // personal calendar to a mailbox calendar the ORGANIZER must
+  // become the mailbox email so SabreDAV sets X-LS-Is-Mailbox and
+  // Django routes the invitation through the Messages API.
+  const organizer: IcsOrganizer | undefined = useMemo(() => {
+    if (event?.organizer) return event.organizer;
+    const mbxEmail = form.selectedCalendarUrl
+      ? calendars.find((c) => c.url === form.selectedCalendarUrl)
+          ?.mailboxEmail
+      : undefined;
+    if (mbxEmail) return { email: mbxEmail, name: mbxEmail.split("@")[0] };
+    if (user?.email) {
+      return {
+        email: user.email,
+        name: user.full_name || user.email.split("@")[0],
+      };
+    }
+    return undefined;
+  }, [event?.organizer, form.selectedCalendarUrl, calendars, user]);
+
+  // Defensive: if the form's selected calendar URL is empty or doesn't
+  // match any entry in the dropdown's options (stale state, race
+  // condition between calendar creation and modal open, URL trailing-
+  // slash mismatch…), auto-snap to the first available calendar so the
+  // user always sees something selected and Save is enabled.
+  useEffect(() => {
+    if (!isOpen || calendars.length === 0) return;
+    const isValid = calendars.some(
+      (cal) => cal.url === form.selectedCalendarUrl,
+    );
+    if (!isValid) {
+      form.setSelectedCalendarUrl(calendars[0].url);
+    }
+  }, [isOpen, calendars, form]);
 
   // Check if current user is invited
   const currentUserAttendee = event?.attendees?.find(
@@ -96,6 +143,15 @@ export const EventModal = ({
     setIsLoading(true);
     try {
       const icsEvent = form.toIcsEvent();
+
+      // Override organizer with the one matching the currently
+      // selected calendar (may differ from the initial prop).
+      if (organizer) {
+        icsEvent.organizer = {
+          email: organizer.email,
+          name: organizer.name,
+        };
+      }
 
       await onSave(
         icsEvent,
@@ -163,6 +219,11 @@ export const EventModal = ({
 
   const { config } = useConfig();
   const meetBaseUrl = config?.FRONTEND_MEET_BASE_URL;
+  // Gate the "Find a time" (FreeBusySection) pill behind a feature
+  // flag. The section issues VFREEBUSY queries against the CalDAV
+  // scheduling outbox; deployments without that capability can hide
+  // the pill entirely by setting FEATURE_EVENT_SCHEDULING=false.
+  const isSchedulingEnabled = useFeatureFlag(FeatureFlag.EVENT_SCHEDULING);
 
   const pills = useMemo(
     () => [
@@ -204,13 +265,17 @@ export const EventModal = ({
             },
           ]
         : []),
-      {
-        id: "scheduling" as const,
-        icon: "event_available",
-        label: t("scheduling.findATime"),
-      },
+      ...(isSchedulingEnabled
+        ? [
+            {
+              id: "scheduling" as const,
+              icon: "event_available",
+              label: t("scheduling.findATime"),
+            },
+          ]
+        : []),
     ],
-    [t, meetBaseUrl, availableResources.length],
+    [t, meetBaseUrl, availableResources.length, isSchedulingEnabled],
   );
 
   return (
@@ -339,7 +404,7 @@ export const EventModal = ({
               alwaysOpen
             />
           )}
-          {form.isSectionExpanded("scheduling") && (
+          {isSchedulingEnabled && form.isSectionExpanded("scheduling") && (
             <FreeBusySection
               attendees={form.attendees}
               resourceEmails={form.resources

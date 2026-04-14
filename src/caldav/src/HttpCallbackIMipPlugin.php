@@ -29,24 +29,31 @@ class HttpCallbackIMipPlugin extends IMipPlugin
     private $server;
 
     /**
-     * Default callback URL (fallback if header is not provided)
-     * @var string|null
+     * @var \PDO
      */
-    private $defaultCallbackUrl;
+    private $pdo;
+
+    /**
+     * Callback URL set at startup from CALDAV_CALLBACK_BASE_URL
+     * @var string
+     */
+    private $callbackUrl;
 
     /**
      * Constructor
      *
      * @param string $apiKey The API key for authenticating with the callback endpoint
-     * @param string|null $defaultCallbackUrl Optional default callback URL
+     * @param \PDO $pdo Database connection for principal lookups
+     * @param string $callbackUrl The callback URL (base URL + path, built at startup)
      */
-    public function __construct($apiKey, $defaultCallbackUrl = null)
+    public function __construct($apiKey, \PDO $pdo, $callbackUrl)
     {
         // Call parent constructor with empty email (we won't use it)
         parent::__construct('');
 
         $this->apiKey = $apiKey;
-        $this->defaultCallbackUrl = $defaultCallbackUrl;
+        $this->pdo = $pdo;
+        $this->callbackUrl = rtrim($callbackUrl, '/') . '/';
     }
 
     /**
@@ -89,27 +96,6 @@ class HttpCallbackIMipPlugin extends IMipPlugin
             return;
         }
 
-        // Get callback URL from the HTTP request header or use default
-        $callbackUrl = null;
-        if ($this->server && $this->server->httpRequest) {
-            $callbackUrl = $this->server->httpRequest->getHeader('X-CalDAV-Callback-URL');
-        }
-
-        // Fall back to default callback URL if header is not provided
-        if (!$callbackUrl && $this->defaultCallbackUrl) {
-            $callbackUrl = $this->defaultCallbackUrl;
-            error_log("[HttpCallbackIMipPlugin] Using default callback URL: {$callbackUrl}");
-        }
-
-        if (!$callbackUrl) {
-            error_log("[HttpCallbackIMipPlugin] ERROR: X-CalDAV-Callback-URL header or default URL is required");
-            $iTipMessage->scheduleStatus = '5.4;X-CalDAV-Callback-URL header or default URL is required';
-            return;
-        }
-
-        // Ensure URL ends with trailing slash for Django's APPEND_SLASH middleware
-        $callbackUrl = rtrim($callbackUrl, '/') . '/';
-
         // Serialize the iCalendar message
         $vcalendar = $iTipMessage->message ? $iTipMessage->message->serialize() : '';
         
@@ -118,20 +104,36 @@ class HttpCallbackIMipPlugin extends IMipPlugin
         $apiKey = trim($this->apiKey);
         $headers = [
             'Content-Type: text/calendar',
-            'X-Api-Key: ' . $apiKey,
-            'X-CalDAV-Sender: ' . $iTipMessage->sender,
-            'X-CalDAV-Recipient: ' . $iTipMessage->recipient,
-            'X-CalDAV-Method: ' . $iTipMessage->method,
+            'X-LS-Api-Key: ' . $apiKey,
+            'X-LS-Sender: ' . $iTipMessage->sender,
+            'X-LS-Recipient: ' . $iTipMessage->recipient,
+            'X-LS-Method: ' . $iTipMessage->method,
         ];
+
+        // Check if the sender is a MAILBOX principal and tell Django
+        // so it can route the invitation through Messages API.
+        $senderEmail = substr($iTipMessage->sender, 7); // strip 'mailto:'
+        if ($this->isSenderMailbox($senderEmail)) {
+            $headers[] = 'X-LS-Is-Mailbox: true';
+        }
+
+        // Pass org_id so Django can include it in RSVP tokens
+        if ($this->server && $this->server->httpRequest) {
+            $orgId = $this->server->httpRequest->getHeader('X-LS-Org-Id');
+            if ($orgId) {
+                $headers[] = 'X-LS-Org-Id: ' . $orgId;
+            }
+        }
         
-        // Make HTTP POST request to Django callback endpoint
-        $ch = curl_init($callbackUrl);
+        // Make HTTP POST request to Django callback endpoint.
+        $ch = curl_init($this->callbackUrl);
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_POSTFIELDS => $vcalendar,
             CURLOPT_TIMEOUT => 10,
+            CURLOPT_FOLLOWLOCATION => false,
         ]);
         
         $response = curl_exec($ch);
@@ -160,5 +162,34 @@ class HttpCallbackIMipPlugin extends IMipPlugin
         
         // Success
         $iTipMessage->scheduleStatus = '1.1;Scheduling message forwarded via HTTP callback';
+    }
+
+    /** @var array Per-request cache for mailbox checks */
+    private $mailboxCache = [];
+
+    /**
+     * Check if a sender email belongs to a MAILBOX principal.
+     *
+     * @param string $email
+     * @return bool
+     */
+    private function isSenderMailbox($email)
+    {
+        if (array_key_exists($email, $this->mailboxCache)) {
+            return $this->mailboxCache[$email];
+        }
+
+        try {
+            $stmt = $this->pdo->prepare(
+                'SELECT calendar_user_type FROM principals WHERE uri = ?'
+            );
+            $stmt->execute(['principals/users/' . $email]);
+            $result = $stmt->fetchColumn() === PrincipalBackend::TYPE_MAILBOX;
+            $this->mailboxCache[$email] = $result;
+            return $result;
+        } catch (\Exception $e) {
+            error_log("[HttpCallbackIMipPlugin] Failed to check principal type: " . $e->getMessage());
+            return false;
+        }
     }
 }

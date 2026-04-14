@@ -11,16 +11,26 @@ from lasuite.oidc_login.backends import (
 
 from core.entitlements import EntitlementsUnavailableError, get_user_entitlements
 from core.models import DuplicateEmailError, Organization
-from core.services.caldav_service import CalDAVClient
 
 logger = logging.getLogger(__name__)
 
 
 def _resolve_org_external_id(claims, email=None):
-    """Extract the organization external_id from OIDC claims or email domain."""
+    """Extract the organization external_id from OIDC claims or email domain.
+
+    When ``OIDC_USERINFO_ORGANIZATION_CLAIM`` is configured, the claim
+    MUST be present in the OIDC userinfo — no fallback. Deployments
+    that opt into the claim want strict org identity, and silently
+    falling back to the email domain would attach users to the wrong
+    org. Returns ``None`` if the claim is missing so the caller can
+    fail closed.
+
+    When the setting is empty, fall back to the email domain so
+    deployments without an org claim still work.
+    """
     claim_key = settings.OIDC_USERINFO_ORGANIZATION_CLAIM
     if claim_key:
-        return claims.get(claim_key)
+        return claims.get(claim_key) or None
     email = email or claims.get("email")
     return email.split("@")[-1] if email and "@" in email else None
 
@@ -116,12 +126,3 @@ class OIDCAuthenticationBackend(LaSuiteOIDCAuthenticationBackend):
             )
 
         resolve_organization(user, claims, entitlements)
-
-        if settings.CALDAV_URL and entitlements.get("can_access", False):
-            try:
-                CalDAVClient().ensure_default_calendar(user)
-            except Exception:  # pylint: disable=broad-exception-caught
-                logger.exception(
-                    "Failed to assert default calendar for %s",
-                    user.email,
-                )

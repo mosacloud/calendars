@@ -84,6 +84,22 @@ class Base(Configuration):
         None, environ_name="CALDAV_INTERNAL_API_KEY", environ_prefix=None
     )
 
+    # Messages app integration (mailbox identity for calendars)
+    FEATURE_MESSAGES_INTEGRATION = values.BooleanValue(
+        False, environ_name="FEATURE_MESSAGES_INTEGRATION", environ_prefix=None
+    )
+    MESSAGES_API_URL = values.Value(
+        None, environ_name="MESSAGES_API_URL", environ_prefix=None
+    )
+    MESSAGES_API_KEY = SecretFileValue(
+        None, environ_name="MESSAGES_API_KEY", environ_prefix=None
+    )
+    # Channel identifier sent as X-Channel-Id on every Messages API call.
+    # Required by the Messages app to scope service-key access.
+    MESSAGES_CHANNEL_ID = values.Value(
+        None, environ_name="MESSAGES_CHANNEL_ID", environ_prefix=None
+    )
+
     # Default calendar sharing level for new organizations.
     # Controls what colleagues in the same org can see by default.
     # Values: "none", "freebusy", "read", "write"
@@ -99,12 +115,6 @@ class Base(Configuration):
         environ_name="SALT_KEY",
         environ_prefix=None,
     )
-    # Base URL for CalDAV scheduling callbacks (must be accessible from CalDAV container)
-    # In Docker environments, use the internal Docker network URL (e.g., http://backend:8000)
-    CALDAV_CALLBACK_BASE_URL = values.Value(
-        None, environ_name="CALDAV_CALLBACK_BASE_URL", environ_prefix=None
-    )
-
     # Email configuration
     # Default settings - override in environment-specific classes
     EMAIL_BACKEND = values.Value(
@@ -549,6 +559,12 @@ class Base(Configuration):
     FEATURE_ADMIN_RESOURCES = values.BooleanValue(
         default=True, environ_name="FEATURE_ADMIN_RESOURCES", environ_prefix=None
     )
+    # Toggles the "Find a time" (FreeBusySection) pill in the event edit
+    # modal. The section issues VFREEBUSY queries against the CalDAV
+    # scheduling outbox.
+    FEATURE_EVENT_SCHEDULING = values.BooleanValue(
+        default=True, environ_name="FEATURE_EVENT_SCHEDULING", environ_prefix=None
+    )
 
     THEME_CUSTOMIZATION_FILE_PATH = values.Value(
         os.path.join(BASE_DIR, "calendars/configuration/theme/default.json"),
@@ -841,7 +857,7 @@ class Base(Configuration):
                     environ_name="LOGGING_LEVEL_LOGGERS_APP",
                     environ_prefix=None,
                 ),
-                "propagate": True,
+                "propagate": False,
             },
         },
     }
