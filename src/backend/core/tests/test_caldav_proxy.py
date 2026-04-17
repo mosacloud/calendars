@@ -803,6 +803,102 @@ class TestInternalApiErrors:
         assert body.get("existing_type") == "MAILBOX"
         assert body.get("requested_type") == "INDIVIDUAL"
 
+    def test_create_calendar_allows_individual_to_mailbox_upgrade(self):
+        """POST /internal-api/calendars/ must allow promoting an
+        auto-provisioned INDIVIDUAL principal (no calendars) to MAILBOX.
+
+        When a user's email is also a Messages mailbox, PROPFIND
+        auto-provisioning creates the principal as INDIVIDUAL before
+        setup runs. The setup flow must be able to promote it.
+        """
+        org = factories.OrganizationFactory(external_id="intapi-upgrade")
+        user = factories.UserFactory(email="user@intapi-upgrade.com", organization=org)
+        target = "shared@intapi-upgrade.com"
+
+        # PROPFIND auto-provisions the principal as INDIVIDUAL (no calendar).
+        resp = _intapi_http.request(
+            "PROPFIND",
+            user,
+            f"principals/users/{target}/",
+        )
+        assert resp.status_code in (200, 207), (
+            f"PROPFIND should auto-provision principal: {resp.status_code} {resp.text}"
+        )
+
+        # Setup call promotes to MAILBOX → must succeed.
+        resp = _intapi_http.request(
+            "POST",
+            user,
+            "internal-api/calendars/",
+            data=json.dumps(
+                {
+                    "email": target,
+                    "name": "Shared",
+                    "calendar_user_type": "MAILBOX",
+                    "org_id": str(user.organization_id),
+                    "caller_email": user.email,
+                }
+            ).encode("utf-8"),
+            content_type="application/json",
+            extra_headers=_INTAPI_HEADERS,
+        )
+        assert resp.status_code in (200, 201), (
+            f"INDIVIDUAL���MAILBOX upgrade should succeed, "
+            f"got {resp.status_code} {resp.text}"
+        )
+
+    def test_create_calendar_allows_upgrade_with_existing_calendars(self):
+        """POST /internal-api/calendars/ allows INDIVIDUAL→MAILBOX
+        even when the principal already owns calendars.
+        """
+        org = factories.OrganizationFactory(external_id="intapi-upgrade-exist")
+        user = factories.UserFactory(
+            email="user@intapi-upgrade-exist.com", organization=org
+        )
+        target = "shared@intapi-upgrade-exist.com"
+
+        # First call creates the principal as INDIVIDUAL + a calendar.
+        resp = _intapi_http.request(
+            "POST",
+            user,
+            "internal-api/calendars/",
+            data=json.dumps(
+                {
+                    "email": target,
+                    "name": "Personal",
+                    "calendar_user_type": "INDIVIDUAL",
+                    "org_id": str(user.organization_id),
+                }
+            ).encode("utf-8"),
+            content_type="application/json",
+            extra_headers=_INTAPI_HEADERS,
+        )
+        assert resp.status_code in (200, 201), (
+            f"Initial individual create failed: {resp.status_code} {resp.text}"
+        )
+
+        # Second call promotes to MAILBOX → must succeed.
+        resp = _intapi_http.request(
+            "POST",
+            user,
+            "internal-api/calendars/",
+            data=json.dumps(
+                {
+                    "email": target,
+                    "name": "Shared",
+                    "calendar_user_type": "MAILBOX",
+                    "org_id": str(user.organization_id),
+                    "caller_email": user.email,
+                }
+            ).encode("utf-8"),
+            content_type="application/json",
+            extra_headers=_INTAPI_HEADERS,
+        )
+        assert resp.status_code in (200, 201), (
+            f"INDIVIDUAL→MAILBOX upgrade should succeed, "
+            f"got {resp.status_code} {resp.text}"
+        )
+
     def test_sync_acls_malformed_json(self):
         """POST /internal-api/sync-mailbox-acls/ with bad JSON returns 400."""
         org = factories.OrganizationFactory(external_id="intapi-badjson")

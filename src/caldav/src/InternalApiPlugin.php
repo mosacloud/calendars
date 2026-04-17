@@ -542,18 +542,20 @@ class InternalApiPlugin extends ServerPlugin
         $this->pdo->beginTransaction();
         try {
             // Refuse to downgrade an existing MAILBOX principal back to
-            // INDIVIDUAL (or any other type). The principal type controls
-            // which auth/ACL rules apply (mailbox shares are sync-managed,
-            // freebusy scoping differs, login is forbidden, …) so a silent
-            // flip via upsert would break invariants other plugins rely on.
-            // The check runs inside the transaction with FOR UPDATE so a
-            // concurrent upsert can't race past it.
+            // INDIVIDUAL. Auto-provisioning (ensurePrincipal) creates
+            // principals as INDIVIDUAL before setup runs, so promoting
+            // INDIVIDUAL → MAILBOX is allowed. The reverse is blocked
+            // because MAILBOX controls auth/ACL rules (sync-managed
+            // shares, freebusy scoping, login is forbidden, …).
             $existing = $this->pdo->prepare(
                 'SELECT calendar_user_type FROM principals WHERE uri = ? FOR UPDATE'
             );
             $existing->execute([$principalUri]);
             $existingType = $existing->fetchColumn();
-            if ($existingType !== false && $existingType !== $calendarUserType) {
+            $isUpgrade = ($existingType === PrincipalBackend::TYPE_INDIVIDUAL
+                          && $calendarUserType === PrincipalBackend::TYPE_MAILBOX);
+            if ($existingType !== false && $existingType !== $calendarUserType
+                && !$isUpgrade) {
                 $this->pdo->rollBack();
                 error_log(
                     "[InternalApiPlugin] Refusing to change calendar_user_type for "
@@ -569,16 +571,13 @@ class InternalApiPlugin extends ServerPlugin
                 return false;
             }
 
-            // ON CONFLICT path: only org_id and displayname may be refreshed.
-            // calendar_user_type is intentionally NOT in the SET list — the
-            // pre-check above already enforces immutability, and dropping it
-            // here removes the silent-downgrade primitive entirely.
             $stmt = $this->pdo->prepare(
                 'INSERT INTO principals (uri, email, displayname, calendar_user_type, org_id)'
                 . ' VALUES (?, ?, ?, ?, ?)'
                 . ' ON CONFLICT (uri) DO UPDATE SET'
                 . ' org_id = EXCLUDED.org_id,'
-                . ' displayname = EXCLUDED.displayname'
+                . ' displayname = EXCLUDED.displayname,'
+                . ' calendar_user_type = EXCLUDED.calendar_user_type'
             );
             $stmt->execute([$principalUri, $email, $name, $calendarUserType, $orgId]);
 
