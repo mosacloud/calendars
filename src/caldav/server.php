@@ -55,6 +55,15 @@ $pdo = new PDO(
     ]
 );
 
+// Route all unqualified table references to the configured schema.
+// Defaults to "public" so existing deployments are unaffected.
+$dbSchema = getenv('CALDAV_DB_SCHEMA') ?: 'public';
+if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $dbSchema)) {
+    error_log("[sabre/dav] CALDAV_DB_SCHEMA must be a valid identifier, got: {$dbSchema}");
+    exit(1);
+}
+$pdo->exec("SET search_path TO \"{$dbSchema}\", public");
+
 // Create custom authentication backend
 // Requires API key authentication and X-LS-User header
 $apiKey = getenv('CALDAV_OUTBOUND_API_KEY');
@@ -109,7 +118,7 @@ $server->addPlugin(new CardDAV\Plugin());
 // default principalCollectionSet ['principals'] would skip it during principal
 // search. Point directly to the child IPrincipalCollection nodes instead.
 $aclPlugin = new DAVACL\Plugin();
-$aclPlugin->principalCollectionSet = ['principals/users', 'principals/resources'];
+$aclPlugin->principalCollectionSet = ['principals/users', 'principals/resources', 'principals/mailboxes'];
 $server->addPlugin($aclPlugin);
 // Browser plugin disabled — it's a debug tool that exposes properties in HTML.
 // $server->addPlugin(new DAV\Browser\Plugin());

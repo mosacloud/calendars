@@ -1551,6 +1551,65 @@ class TestNoAccessSharing:
             f"got {response.status_code}"
         )
 
+    def test_non_shared_user_cannot_move_events(self):
+        """A non-shared user cannot MOVE events out of another user's calendar.
+
+        The proxy is a dumb forwarder for OIDC users: no proxy-side
+        principal/path scope enforcement (mirroring PUT/DELETE).
+        SabreDAV's stock ACL is what blocks this — a stranger has no
+        ``unbind`` privilege on another user's calendar by default —
+        and this test pins that contract.
+
+        MOVE is two-resource, so the test asserts three independent
+        things: the request was rejected, the source event survives in
+        the owner's calendar, and the destination resource was not
+        created in the stranger's calendar. The third assertion guards
+        against partial-success regressions (a future plugin that
+        binds before checking unbind, or that mirrors instead of
+        moves) — those would pass a status-code-only test.
+        """
+        org = factories.OrganizationFactory(external_id="no-access-move")
+        owner, owner_client, owner_cal_path = _create_user_with_calendar(
+            org, "owner-nam"
+        )
+        stranger, stranger_client, stranger_cal_path = _create_user_with_calendar(
+            org, "stranger-nam"
+        )
+        owner_cal_id = _get_cal_id(owner_cal_path)
+        stranger_cal_id = _get_cal_id(stranger_cal_path)
+
+        _put_event(owner_client, owner.email, owner_cal_id, "stay-put", "Untouchable")
+
+        src_path = f"/caldav/calendars/users/{owner.email}/{owner_cal_id}/stay-put.ics"
+        dest_path = (
+            f"http://example/caldav/calendars/users/{stranger.email}/"
+            f"{stranger_cal_id}/stay-put.ics"
+        )
+        response = stranger_client.generic("MOVE", src_path, HTTP_DESTINATION=dest_path)
+        assert response.status_code in (403, 404), (
+            f"SECURITY: cross-user MOVE should be blocked by SabreDAV ACL, "
+            f"got {response.status_code}"
+        )
+
+        # Source: still in the owner's calendar (not unbound).
+        get_src = _get_event(owner_client, owner.email, owner_cal_id, "stay-put")
+        assert get_src.status_code == 200, (
+            f"Event must remain in owner's calendar after blocked MOVE, "
+            f"got GET status {get_src.status_code}"
+        )
+
+        # Destination: not created in the stranger's calendar (no
+        # partial bind). Use the stranger's own client so a 404 here is
+        # genuine absence, not an ACL refusal.
+        get_dst = _get_event(
+            stranger_client, stranger.email, stranger_cal_id, "stay-put"
+        )
+        assert get_dst.status_code == 404, (
+            f"SECURITY: blocked MOVE must not have created the destination "
+            f"resource in the stranger's calendar, got GET status "
+            f"{get_dst.status_code}"
+        )
+
     def test_non_shared_user_cannot_report_events(self):
         """A non-shared user cannot REPORT on another user's calendar."""
         org = factories.OrganizationFactory(external_id="no-access-report")
@@ -2079,7 +2138,7 @@ class TestFreebusyEnforcement:
             except Exception:  # noqa: BLE001
                 continue
 
-    def test_freebusy_sharee_cannot_copy_event(self):
+    def test_freebusy_sharee_cannot_copy_event(self):  # pylint: disable=too-many-locals
         """Freebusy sharee MUST NOT be able to COPY events to their own calendar."""
         org = factories.OrganizationFactory(external_id="fb-copy-block")
         owner, owner_client, cal_path = _create_user_with_calendar(org, "owner-fbcp")
@@ -2122,9 +2181,54 @@ class TestFreebusyEnforcement:
             f"/caldav/{src_path}",
             HTTP_DESTINATION=dest_path,
         )
-        assert response.status_code in (403, 409), (
+        # Accepted blocking statuses:
+        #   - 403/409: SabreDAV ACL or scheduling plugin rejected the COPY.
+        #   - 405: the Django proxy's method allowlist refuses COPY at the
+        #     edge (defense in depth — strictly stronger than ACL-level
+        #     blocking, since the request never reaches SabreDAV).
+        assert response.status_code in (403, 405, 409), (
             f"SECURITY: COPY from freebusy calendar should be blocked, "
             f"got {response.status_code}"
+        )
+
+        # Sanity check: if the freebusy block above resolved as 405, that
+        # was the proxy's global COPY-not-allowed gate, not the
+        # freebusy-specific ACL. Prove that by issuing the same COPY as a
+        # non-freebusy READ-WRITE sharee — they should get 405 too,
+        # because the proxy blocks COPY for everyone. This documents that
+        # the freebusy assertion above is currently dominated by
+        # proxy-level blocking; if COPY is ever added to the proxy
+        # allowlist, both branches will need to reflect Sabre-side
+        # enforcement instead.
+        rw_sharee, _, rw_sharee_cal_path = _create_user_with_calendar(
+            org, "rw-sharee-fbcp"
+        )
+        rw_sharee_cal_id = _get_cal_id(rw_sharee_cal_path)
+        rw_sharee_client = APIClient()
+        rw_sharee_client.force_login(rw_sharee)
+        _share_calendar_via_caldav(
+            owner_client, owner, cal_id, rw_sharee.email, "read-write"
+        )
+        # Destination must be the rw_sharee's own calendar — using the
+        # freebusy sharee's path would mix in unrelated cross-user ACL
+        # effects and muddle the signal the moment COPY is added to the
+        # proxy allowlist (which is precisely what this sanity check
+        # exists to catch).
+        dest_path_rw = (
+            f"/caldav/calendars/users/{rw_sharee.email}/"
+            f"{rw_sharee_cal_id}/copied-event.ics"
+        )
+        rw_response = rw_sharee_client.generic(
+            "COPY",
+            f"/caldav/{src_path}",
+            HTTP_DESTINATION=dest_path_rw,
+        )
+        assert rw_response.status_code == 405, (
+            "Expected proxy-level 405 on COPY for a non-freebusy "
+            "read-write sharee (the proxy blocks COPY for everyone). "
+            f"Got {rw_response.status_code}; if Sabre rejected this "
+            "instead, COPY may have been added to the proxy allowlist "
+            "and the freebusy assertion above must be re-tightened."
         )
 
 
@@ -2884,6 +2988,193 @@ class TestSyncAclEdgeCases:
         )
 
 
+class TestSyncSameEmailCoexistence:
+    """When user.email == mailbox_email, they are separate principals
+    (principals/users/ vs principals/mailboxes/). Sync creates a normal
+    sharee instance for the user — no collision, no special handling.
+    """
+
+    def test_sync_creates_sharee_for_owner_email(self):
+        """sync-mailbox-acls creates a normal sharee row when the
+        user's email matches the mailbox email. With the namespace
+        split, owner (principals/mailboxes/) and sharee
+        (principals/users/) have different principaluri values.
+        """
+        org = factories.OrganizationFactory(external_id="sync-coexist")
+        user = factories.UserFactory(email="user@sync-coexist.com", organization=org)
+        mailbox_email = user.email
+
+        _create_mailbox_calendar(user, mailbox_email, org, name="Personal")
+
+        calendars_before = _list_calendar_urls(user)
+
+        resp = _sync_mailbox_acls(
+            user,
+            [
+                {
+                    "user_email": user.email,
+                    "mailbox_email": mailbox_email,
+                    "privilege": "read-write",
+                }
+            ],
+        )
+
+        active = resp.json().get("active", [])
+        active_emails = [a["mailbox_email"] for a in active]
+        assert mailbox_email in active_emails, (
+            f"Mailbox must appear in active, got {active}"
+        )
+
+        calendars_after = _list_calendar_urls(user)
+        new_urls = calendars_after - calendars_before
+        assert len(new_urls) > 0, (
+            f"Sync should create at least one user-visible sharee calendar. "
+            f"Before: {calendars_before}, After: {calendars_after}"
+        )
+
+
+class TestRsvpInternalApi:
+    """POST /internal-api/rsvp/ finds events by UID across all
+    principals matching the organizer email and updates PARTSTAT.
+    """
+
+    def test_rsvp_personal_mailbox(self):
+        """RSVP updates PARTSTAT for an event in a personal mailbox
+        calendar (user.email == mailbox_email).
+        """
+        org = factories.OrganizationFactory(external_id="rsvp-personal")
+        user = factories.UserFactory(email="user@rsvp-personal.com", organization=org)
+
+        _create_mailbox_calendar(user, user.email, org, name="Personal")
+        _sync_mailbox_acls(
+            user,
+            [
+                {
+                    "user_email": user.email,
+                    "mailbox_email": user.email,
+                    "privilege": "read-write",
+                }
+            ],
+        )
+
+        uid = f"rsvp-test-{secrets.token_hex(8)}"
+        attendee = "bob@rsvp-personal.com"
+        ics = (
+            "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"
+            "BEGIN:VEVENT\r\n"
+            f"UID:{uid}\r\n"
+            "DTSTART:20260501T100000Z\r\n"
+            "DTEND:20260501T110000Z\r\n"
+            "SUMMARY:Personal RSVP\r\n"
+            f"ORGANIZER:mailto:{user.email}\r\n"
+            f"ATTENDEE;PARTSTAT=NEEDS-ACTION:mailto:{attendee}\r\n"
+            "END:VEVENT\r\nEND:VCALENDAR\r\n"
+        )
+        dav = CalDAVHTTPClient().get_dav_client(user)
+        dav.principal().calendars()[0].save_event(ics)
+
+        resp = http.internal_request(
+            "POST",
+            user,
+            "internal-api/rsvp/",
+            json={
+                "organizer_email": user.email,
+                "uid": uid,
+                "attendee_email": attendee,
+                "partstat": "ACCEPTED",
+            },
+        )
+        assert resp.status_code == 200, (
+            f"RSVP should succeed: {resp.status_code} {resp.text}"
+        )
+        assert resp.json().get("summary") == "Personal RSVP"
+
+    def test_rsvp_team_mailbox(self):
+        """RSVP updates PARTSTAT for an event in a team mailbox
+        calendar (no user logs in with the organizer email).
+        The internal API finds it via DB query across all namespaces.
+        """
+        org = factories.OrganizationFactory(external_id="rsvp-team")
+        admin = factories.UserFactory(email="admin@rsvp-team.com", organization=org)
+        team_email = "team@rsvp-team.com"
+
+        _create_mailbox_calendar(admin, team_email, org, name="Team")
+        _sync_mailbox_acls(
+            admin,
+            [
+                {
+                    "user_email": admin.email,
+                    "mailbox_email": team_email,
+                    "privilege": "read-write",
+                }
+            ],
+        )
+
+        uid = f"rsvp-team-{secrets.token_hex(8)}"
+        attendee = "charlie@rsvp-team.com"
+        ics = (
+            "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"
+            "BEGIN:VEVENT\r\n"
+            f"UID:{uid}\r\n"
+            "DTSTART:20260501T100000Z\r\n"
+            "DTEND:20260501T110000Z\r\n"
+            "SUMMARY:Team Event\r\n"
+            f"ORGANIZER:mailto:{team_email}\r\n"
+            f"ATTENDEE;PARTSTAT=NEEDS-ACTION:mailto:{attendee}\r\n"
+            "END:VEVENT\r\nEND:VCALENDAR\r\n"
+        )
+
+        # Write event via admin's shared view of the team calendar.
+        # The sharee instance has a UUID URI under calendars/users/admin@.
+        # Find it by checking which calendar was added after setup.
+        dav = CalDAVHTTPClient().get_dav_client(admin)
+        cals = dav.principal().calendars()
+        shared_cal = None
+        for cal in cals:
+            cal_url = str(cal.url)
+            if "admin@rsvp-team.com" not in cal_url or "default" in cal_url:
+                continue
+            shared_cal = cal
+            break
+        if not shared_cal:
+            shared_cal = cals[-1]
+        shared_cal.save_event(ics)
+
+        resp = http.internal_request(
+            "POST",
+            admin,
+            "internal-api/rsvp/",
+            json={
+                "organizer_email": team_email,
+                "uid": uid,
+                "attendee_email": attendee,
+                "partstat": "TENTATIVE",
+            },
+        )
+        assert resp.status_code == 200, (
+            f"Team RSVP should succeed: {resp.status_code} {resp.text}"
+        )
+        assert resp.json().get("summary") == "Team Event"
+
+    def test_rsvp_event_not_found(self):
+        """RSVP returns 404 for a nonexistent event UID."""
+        org = factories.OrganizationFactory(external_id="rsvp-notfound")
+        user = factories.UserFactory(email="user@rsvp-notfound.com", organization=org)
+
+        resp = http.internal_request(
+            "POST",
+            user,
+            "internal-api/rsvp/",
+            json={
+                "organizer_email": user.email,
+                "uid": "nonexistent-uid",
+                "attendee_email": "bob@example.com",
+                "partstat": "ACCEPTED",
+            },
+        )
+        assert resp.status_code == 404
+
+
 class TestProppatchScheduleTransp:
     """PROPPATCH schedule-calendar-transp on a sharee instance must work
     against PostgreSQL.
@@ -3259,7 +3550,7 @@ class TestInternalApiCreateMailboxCalendar:
         )
 
     @staticmethod
-    def _read_color(reader, owner_email, calendar_uri):
+    def _read_color(reader, owner_email, calendar_uri, namespace="users"):
         body = (
             '<?xml version="1.0" encoding="utf-8"?>'
             '<D:propfind xmlns:D="DAV:" '
@@ -3270,7 +3561,7 @@ class TestInternalApiCreateMailboxCalendar:
         resp = CalDAVHTTPClient().request(
             "PROPFIND",
             reader,
-            f"calendars/users/{owner_email}/{calendar_uri}/",
+            f"calendars/{namespace}/{owner_email}/{calendar_uri}/",
             data=body,
             content_type="application/xml; charset=utf-8",
             extra_headers={"Depth": "0"},
@@ -3334,7 +3625,9 @@ class TestInternalApiCreateMailboxCalendar:
         # must NOT show the picked color — the owner row is invisible
         # to humans and we deliberately leave it at the default so the
         # color stays personal.
-        owner_color = self._read_color(caller, mailbox_email, owner_uri)
+        owner_color = self._read_color(
+            caller, mailbox_email, owner_uri, namespace="mailboxes"
+        )
         assert owner_color != "#dc3545", (
             f"Owner instance must not carry the personal color, got {owner_color!r}"
         )

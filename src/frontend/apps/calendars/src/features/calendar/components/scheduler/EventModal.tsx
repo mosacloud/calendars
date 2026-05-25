@@ -6,8 +6,8 @@ import {
   Input,
   Modal,
   ModalSize,
-  Select,
 } from "@gouvfr-lasuite/cunningham-react";
+import { CalendarSelect } from "./CalendarSelect";
 
 import { useAuth } from "@/features/auth/Auth";
 import { addToast, ToasterItem } from "@/features/ui/components/toaster/Toaster";
@@ -102,20 +102,21 @@ export const EventModal = ({
     return undefined;
   }, [event?.organizer, form.selectedCalendarUrl, calendars, user]);
 
-  // Defensive: if the form's selected calendar URL is empty or doesn't
-  // match any entry in the dropdown's options (stale state, race
-  // condition between calendar creation and modal open, URL trailing-
-  // slash mismatch…), auto-snap to the first available calendar so the
-  // user always sees something selected and Save is enabled.
+  // Defensive fallback to keep a valid selection when the caller did
+  // not pass one (e.g. "new event" from a context with no default
+  // calendar). When `calendarUrl` is non-empty we trust it, even if
+  // it isn't in `calendars` yet — the list may still be loading and
+  // auto-snapping to calendars[0] here would stomp the correct choice.
   useEffect(() => {
     if (!isOpen || calendars.length === 0) return;
-    const isValid = calendars.some(
+    if (calendarUrl) return;
+    const currentIsValid = calendars.some(
       (cal) => cal.url === form.selectedCalendarUrl,
     );
-    if (!isValid) {
+    if (!currentIsValid) {
       form.setSelectedCalendarUrl(calendars[0].url);
     }
-  }, [isOpen, calendars, form]);
+  }, [isOpen, calendars, calendarUrl, form]);
 
   // Check if current user is invited
   const currentUserAttendee = event?.attendees?.find(
@@ -340,20 +341,10 @@ export const EventModal = ({
             label={t("calendar.event.calendar")}
             alwaysOpen={true}
           >
-            <Select
-              label={t("calendar.event.calendar")}
-              hideLabel
+            <CalendarSelect
+              calendars={calendars}
               value={form.selectedCalendarUrl}
-              onChange={(e) =>
-                form.setSelectedCalendarUrl(String(e.target.value))
-              }
-              options={calendars.map((cal) => ({
-                value: cal.url,
-                label: cal.displayName || cal.url,
-              }))}
-              clearable={false}
-              variant="classic"
-              fullWidth
+              onChange={form.setSelectedCalendarUrl}
             />
           </SectionRow>
           <DateTimeSection
@@ -396,13 +387,34 @@ export const EventModal = ({
           )}
 
           {form.isSectionExpanded("attendees") && (
-            <AttendeesSection
-              attendees={form.attendees}
-              onChange={form.setAttendees}
-              organizerEmail={organizer?.email ?? user?.email}
-              organizer={organizer}
-              alwaysOpen
-            />
+            <>
+              <AttendeesSection
+                attendees={form.attendees}
+                onChange={form.setAttendees}
+                organizerEmail={organizer?.email ?? user?.email}
+                organizer={organizer}
+                alwaysOpen
+              />
+              {form.attendees.length > 0 && (
+                <p
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#9ca3af",
+                    margin: "-8px 0 8px 36px",
+                    padding: 0,
+                  }}
+                >
+                  {t("calendar.attendees.sentFrom", {
+                    email:
+                      calendars.find(
+                        (c) => c.url === form.selectedCalendarUrl,
+                      )?.mailboxEmail ||
+                      config?.CALENDAR_INVITATION_FROM_EMAIL ||
+                      "",
+                  })}
+                </p>
+              )}
+            </>
           )}
           {isSchedulingEnabled && form.isSectionExpanded("scheduling") && (
             <FreeBusySection

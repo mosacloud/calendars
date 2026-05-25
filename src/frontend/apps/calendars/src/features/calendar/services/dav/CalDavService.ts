@@ -36,6 +36,7 @@ import type {
   CalDavEvent,
   CalDavEventCreate,
   CalDavEventUpdate,
+  CalDavEventMove,
   EventFilter,
   CalDavShareInvite,
   CalDavShareResponse,
@@ -87,6 +88,35 @@ export class CalDavService {
 
   async connect(credentials: CalDavCredentials): Promise<CalDavResponse<CalDavAccount>> {
     return withErrorHandling(async () => {
+      // Fast path: skip tsdav discovery (.well-known redirect + two PROPFINDs)
+      // when we know the user's email. SabreDAV exposes principals and
+      // calendar homes at fixed paths (see src/caldav/server.php).
+      //
+      // The path segment encoding must match what SabreDAV emits in its
+      // PROPFIND hrefs — otherwise the hardcoded homeUrl won't be a
+      // string-prefix of the calendar URLs we later receive, and the
+      // owned-vs-shared bucket logic in CalendarContext breaks. SabreDAV's
+      // URLUtil::encodePath leaves RFC 3986 sub-delims and `@` literal,
+      // whereas encodeURIComponent escapes `@` (→ %40) and `+` (→ %2B),
+      // so we put those two back.
+      if (credentials.userEmail) {
+        const serverUrl = credentials.serverUrl.endsWith('/')
+          ? credentials.serverUrl
+          : `${credentials.serverUrl}/`
+        const encodedEmail = encodeURIComponent(credentials.userEmail)
+          .replace(/%40/g, '@')
+          .replace(/%2B/g, '+')
+        this._account = {
+          serverUrl,
+          rootUrl: serverUrl,
+          principalUrl: `${serverUrl}principals/users/${encodedEmail}/`,
+          homeUrl: `${serverUrl}calendars/users/${encodedEmail}/`,
+          headers: credentials.headers,
+          fetchOptions: credentials.fetchOptions,
+        }
+        return this._account
+      }
+
       const account = await createAccount({
         account: {
           serverUrl: credentials.serverUrl,
@@ -1074,6 +1104,91 @@ export class CalDavService {
       this._events.set(updatedEvent.url, updatedEvent)
       return updatedEvent
     }, 'Failed to update event')
+  }
+
+  /**
+   * Relocate an event resource to a different calendar via WebDAV MOVE.
+   *
+   * SabreDAV's Schedule\Plugin skips iTIP dispatch on MOVE (CalDAV/Schedule/
+   * Plugin.php#beforeUnbind), which is the desired behavior when an organizer
+   * moves an event between their own calendars: attendees should not receive
+   * spurious REQUEST/CANCEL emails. Content edits (which may warrant iTIP)
+   * should be applied via a follow-up updateEvent at the returned URL — the
+   * `significantChange` filter then decides whether to notify attendees.
+   *
+   * Returns the new resource URL and ETag. Source ETag, if provided, is sent
+   * as If-Match for an optimistic-concurrency precondition.
+   */
+  async moveEvent(
+    params: CalDavEventMove,
+  ): Promise<CalDavResponse<{ url: string; etag?: string }>> {
+    const targetCalendar = this._calendars.get(params.targetCalendarUrl)
+    if (!targetCalendar) {
+      return { success: false, error: 'Target calendar not found' }
+    }
+
+    const cachedSource = this._events.get(params.sourceEventUrl)
+    const sourceCalendarUrl =
+      cachedSource?.calendarUrl ?? getCalendarUrlFromEventUrl(params.sourceEventUrl)
+    const sourceCalendar = this._calendars.get(sourceCalendarUrl)
+
+    return withErrorHandling(async () => {
+      // Strip trailing slashes before splitting so a stray collection-shaped
+      // URL (ends with `/`) doesn't yield an empty filename that we'd then
+      // concatenate onto the target — producing the target collection URL
+      // as the destination. Also require the `.ics` suffix so only event
+      // resources are moveable through this path; the proxy and SabreDAV
+      // would reject a collection-targeted MOVE anyway, but failing here
+      // is louder and avoids a misleading server error.
+      const filename = params.sourceEventUrl.replace(/\/+$/, '').split('/').pop()
+      if (!filename || !filename.endsWith('.ics')) {
+        throw new Error('Could not derive event filename from source URL')
+      }
+      const newEventUrl = `${params.targetCalendarUrl}${filename}`
+      const sourceEtag = params.sourceEtag ?? cachedSource?.etag
+
+      // The source calendar may not be in the cache (stale state, refresh
+      // race, or a source URL whose calendar key doesn't normalize to a
+      // cached entry). Fall back to the target calendar's auth/fetch
+      // settings so credentials are always sent — both calendars belong
+      // to the same CalDAV account, so the headers are interchangeable.
+      const fetchOptions = {
+        ...targetCalendar.fetchOptions,
+        ...sourceCalendar?.fetchOptions,
+      }
+      const authHeaders = {
+        ...targetCalendar.headers,
+        ...sourceCalendar?.headers,
+      }
+      const response = await fetch(params.sourceEventUrl, {
+        ...fetchOptions,
+        method: 'MOVE',
+        headers: {
+          ...authHeaders,
+          Destination: newEventUrl,
+          Overwrite: 'F',
+          ...(sourceEtag ? { 'If-Match': sourceEtag } : {}),
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to move event: ${response.status}`)
+      }
+
+      const newEtag = response.headers.get('etag') ?? undefined
+
+      if (cachedSource) {
+        this._events.delete(params.sourceEventUrl)
+        this._events.set(newEventUrl, {
+          ...cachedSource,
+          url: newEventUrl,
+          calendarUrl: params.targetCalendarUrl,
+          etag: newEtag,
+        })
+      }
+
+      return { url: newEventUrl, etag: newEtag }
+    }, 'Failed to move event')
   }
 
   async deleteEvent(eventUrl: string, etag?: string): Promise<CalDavResponse> {

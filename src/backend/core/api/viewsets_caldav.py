@@ -1,10 +1,14 @@
 """CalDAV proxy views for forwarding requests to CalDAV server."""
 
+import base64
+import binascii
 import logging
 import re
 import secrets
+from urllib.parse import urlparse
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.http import HttpResponse
 from django.utils import timezone
@@ -15,11 +19,36 @@ from django.views.decorators.csrf import csrf_exempt
 import requests
 
 from core.entitlements import EntitlementsUnavailableError, get_user_entitlements
-from core.models import Channel
+from core.enums import ChannelScopeLevel
+from core.models import Channel, User, urlsafe_to_uuid
 from core.services.caldav_service import CalDAVHTTPClient, validate_caldav_proxy_path
 from core.services.calendar_invitation_service import calendar_invitation_service
 
 logger = logging.getLogger(__name__)
+
+
+# Methods the proxy will forward to SabreDAV. Anything outside this set
+# returns 405 before authentication is even consulted. Defense in depth:
+# SabreDAV's own ACL is the source of truth, but limiting the verb
+# surface here means a future Sabre plugin (LOCK, ACL writes, etc.)
+# cannot be reached without an explicit proxy update. This set must
+# also be advertised in the OPTIONS preflight response so browser
+# clients can discover what they're allowed to send.
+ALLOWED_PROXY_METHODS = frozenset(
+    {
+        "GET",
+        "OPTIONS",
+        "PROPFIND",
+        "PROPPATCH",
+        "REPORT",
+        "MKCOL",
+        "MKCALENDAR",
+        "PUT",
+        "DELETE",
+        "POST",
+        "MOVE",
+    }
+)
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -28,7 +57,8 @@ class CalDAVProxyView(View):
     Proxy view that forwards all CalDAV requests to CalDAV server.
 
     THIS PROXY MUST REMAIN DUMB. It handles:
-    - Authentication (OIDC → X-LS-User header)
+    - Authentication (OIDC or HTTP Basic Auth → X-LS-User header)
+    - Scope-based method enforcement
     - Entitlement checks for calendar creation (MKCALENDAR)
 
     It MUST NOT implement:
@@ -40,81 +70,144 @@ class CalDAVProxyView(View):
     All business logic runs in SabreDAV via plugins. The proxy is a
     transparent forwarder with authentication. Keep it that way.
 
-    CSRF protection is disabled because CalDAV uses non-standard HTTP methods
-    (PROPFIND, REPORT, etc.) that don't work with Django's CSRF middleware.
-    Authentication is handled via session cookies instead.
+    External services authenticate via HTTP Basic Auth where the
+    username is the user's email (enabling standard CalDAV principal
+    discovery) and the password is ``channel_id`` immediately followed
+    by ``channel_token`` (no separator; the channel_id is a fixed-length
+    22-char base64url UUID). This is standard CalDAV auth that works
+    with any CalDAV client library.
     """
 
-    # HTTP methods allowed per Channel role
-    READER_METHODS = frozenset({"GET", "PROPFIND", "REPORT", "OPTIONS"})
-    EDITOR_METHODS = READER_METHODS | frozenset({"PUT", "POST", "DELETE", "PROPPATCH"})
-    ADMIN_METHODS = EDITOR_METHODS | frozenset({"MKCALENDAR", "MKCOL"})
-
-    ROLE_METHODS = {
-        Channel.ROLE_READER: READER_METHODS,
-        Channel.ROLE_EDITOR: EDITOR_METHODS,
-        Channel.ROLE_ADMIN: ADMIN_METHODS,
-    }
+    # Length of a base64url-encoded UUID (16 bytes) without padding.
+    _CHANNEL_ID_LEN = 22
 
     @staticmethod
-    def _authenticate_channel_token(request):
-        """Try to authenticate via X-Channel-Id + X-Channel-Token headers.
+    def _authenticate_basic_auth(request):
+        """Authenticate via HTTP Basic Auth.
 
-        Returns (channel, user) on success, (None, None) on failure.
+        Basic-auth payload: ``user_email:<channel_id><token>``
+
+        The username is the user's email (enabling standard CalDAV
+        principal discovery). The password is the 22-char base64url
+        channel id concatenated with the raw token.
+
+        Returns (channel, email) on success, (None, None) on failure.
         """
-        channel_id = request.headers.get("X-Channel-Id", "").strip()
-        token = request.headers.get("X-Channel-Token", "").strip()
-        if not channel_id or not token:
+        auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+        if not auth_header.startswith("Basic "):
             return None, None
 
         try:
-            channel = Channel.objects.get(pk=channel_id, is_active=True, type="caldav")
-        except (ValueError, Channel.DoesNotExist):
+            decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+            email, credentials = decoded.split(":", 1)
+        except (ValueError, UnicodeDecodeError, binascii.Error):
+            return None, None
+
+        channel_id = credentials[: CalDAVProxyView._CHANNEL_ID_LEN]
+        token = credentials[CalDAVProxyView._CHANNEL_ID_LEN :]
+
+        if not email or not channel_id or not token:
+            return None, None
+
+        try:
+            channel_pk = urlsafe_to_uuid(channel_id)
+            channel = Channel.objects.select_related("user", "user__organization").get(
+                pk=channel_pk, is_active=True, type="caldav"
+            )
+        except (ValueError, ValidationError, binascii.Error, Channel.DoesNotExist):
             return None, None
 
         if not channel.verify_token(token):
             return None, None
 
-        user = channel.user
-        if not user:
-            logger.warning("Channel %s has no user", channel.id)
-            return None, None
-
-        # Update last_used_at (fire-and-forget, no extra query on critical path)
         Channel.objects.filter(pk=channel.pk).update(last_used_at=timezone.now())
+        return channel, email
 
-        return channel, user
+    @staticmethod
+    def _resolve_channel_user(channel, email):
+        """Resolve the acting user from channel scope + Basic Auth email.
+
+        For global channels, the email from Basic Auth determines the
+        acting user. For user/calendar channels, the email must match
+        the channel's bound user.
+
+        Returns (user, error_response) — exactly one is None.
+        """
+        if channel.scope_level == ChannelScopeLevel.GLOBAL:
+            try:
+                user = User.objects.select_related("organization").get(
+                    email__iexact=email
+                )
+            except User.DoesNotExist:
+                return None, HttpResponse(status=403, content="Unknown user")
+            return user, None
+
+        if not channel.user:
+            return None, HttpResponse(status=500, content="Channel has no user")
+        if channel.user.email.lower() != email.lower():
+            return None, HttpResponse(
+                status=403, content="Email does not match channel user"
+            )
+        return channel.user, None
 
     @staticmethod
     def _check_channel_path_access(channel, path):
         """Check that the CalDAV path is within the channel's scope.
 
         Returns True if allowed, False if denied.
+
+        CalDAV clients (Thunderbird, Apple Calendar, etc.) bootstrap by
+        PROPFIND-ing the server root and the user's principal URL to
+        discover the calendar-home-set. So in addition to the channel's
+        own scope, every authenticated channel may PROPFIND its own
+        principal and the root. This exposes no data the channel could
+        not have reached anyway via its calendar home.
         """
-        # Ensure path starts with /
         full_path = "/" + path.lstrip("/") if path else "/"
 
-        # caldav_path scope: request must be within the scoped calendar
-        # The trailing slash on caldav_path (enforced by serializer) ensures
-        # /cal1/ won't match /cal1-secret/
-        if channel.caldav_path:
-            if not channel.caldav_path.endswith("/"):
-                logger.error(
-                    "caldav_path %r missing trailing slash", channel.caldav_path
-                )
-                return False
-            return full_path.startswith(channel.caldav_path)
+        if channel.scope_level == ChannelScopeLevel.GLOBAL:
+            return True
 
-        # user scope: request must be under the user's calendars
-        if channel.user:
-            user_prefix = f"/calendars/users/{channel.user.email}/"
-            return full_path.startswith(user_prefix)
+        # User/calendar scope: must have a bound user.
+        if not channel.user:
+            return False
 
-        return False
+        # Discovery: root + the channel-user's own principal are
+        # always reachable. The method-scope check (PROPFIND/OPTIONS
+        # only for read scopes) already prevents writes here.
+        principal_prefix = f"/principals/users/{channel.user.email}/"
+        if full_path == "/" or full_path.startswith(principal_prefix):
+            return True
+
+        if channel.scope_level == ChannelScopeLevel.CALENDAR:
+            cal_path = channel.caldav_path
+            if cal_path and not cal_path.endswith("/"):
+                logger.error("caldav_path %r missing trailing slash", cal_path)
+                cal_path = None
+            return bool(cal_path) and full_path.startswith(cal_path)
+
+        user_prefix = f"/calendars/users/{channel.user.email}/"
+        return full_path.startswith(user_prefix)
 
     @staticmethod
-    def _check_entitlements_for_creation(user):
-        """Check if user is entitled to create calendars.
+    def _is_collection_path(path):
+        """Return True if the path targets a CalDAV collection (calendar)
+        rather than an object (event).
+
+        CalDAV collections always end with ``/`` (RFC 4918, enforced by
+        SabreDAV). Objects end with ``.ics``. Unknown paths default to
+        collection (fail-safe: more restrictive).
+        """
+        if path and path.endswith("/"):
+            return True
+        if path and path.endswith(".ics"):
+            return False
+        return True
+
+    @staticmethod
+    def _check_entitlements_for_calendar_management(user):
+        """Check if user is entitled to manage their calendars
+        (create or delete).
 
         Returns None if allowed, or an HttpResponse(403) if denied.
         Fail-closed: denies if the entitlements service is unavailable.
@@ -124,74 +217,103 @@ class CalDAVProxyView(View):
             if not entitlements.get("can_access", False):
                 return HttpResponse(
                     status=403,
-                    content="Calendar creation not allowed",
+                    content="Calendar management not allowed",
                 )
         except EntitlementsUnavailableError:
             return HttpResponse(
                 status=403,
-                content="Calendar creation not allowed",
+                content="Calendar management not allowed",
             )
         return None
 
     def dispatch(self, request, *args, **kwargs):  # noqa: PLR0912, PLR0911, PLR0915  # pylint: disable=too-many-branches,too-many-return-statements,too-many-statements,too-many-locals
         """Forward all HTTP methods to CalDAV server."""
-        # Handle CORS preflight requests
         if request.method == "OPTIONS":
             response = HttpResponse(status=200)
-            response["Access-Control-Allow-Methods"] = (
-                "GET, OPTIONS, PROPFIND, PROPPATCH, REPORT,"
-                " MKCOL, MKCALENDAR, PUT, DELETE, POST"
+            response["Access-Control-Allow-Methods"] = ", ".join(
+                sorted(ALLOWED_PROXY_METHODS)
             )
             response["Access-Control-Allow-Headers"] = (
-                "Content-Type, depth, x-channel-id, x-channel-token,"
-                " if-match, if-none-match, prefer"
+                "Content-Type, depth, authorization, if-match, if-none-match,"
+                " prefer, destination, overwrite, x-ls-client"
             )
             return response
 
-        # Try channel token auth first (for external services like Messages)
+        if request.method not in ALLOWED_PROXY_METHODS:
+            response = HttpResponse(
+                status=405, content="Method not allowed by CalDAV proxy"
+            )
+            response["Allow"] = ", ".join(sorted(ALLOWED_PROXY_METHODS))
+            return response
+
         channel = None
         effective_user = None
+        path = kwargs.get("path", "")
+
         if not request.user.is_authenticated:
-            channel, effective_user = self._authenticate_channel_token(request)
+            channel, email = self._authenticate_basic_auth(request)
             if not channel:
-                return HttpResponse(status=401)
+                resp = HttpResponse(status=401)
+                # Browser requests carry X-LS-Client: web. Omit the Basic
+                # challenge for them so the native browser popup doesn't
+                # appear when a session expires — the frontend detects the
+                # 401 and redirects to login. CalDAV clients (Thunderbird,
+                # Apple Calendar, DAVx⁵…) don't send this header, so they
+                # still get the standard challenge and complete auth.
+                if request.headers.get("X-LS-Client") != "web":
+                    resp["WWW-Authenticate"] = 'Basic realm="CalDAV"'
+                return resp
+            effective_user, err = self._resolve_channel_user(channel, email)
+            if err:
+                return err
         else:
             effective_user = request.user
 
+        is_collection = self._is_collection_path(path)
+
         if channel:
-            # Enforce role-based method restrictions
-            allowed = self.ROLE_METHODS.get(channel.role, self.READER_METHODS)
+            allowed = channel.allowed_methods(collection=is_collection)
             if request.method not in allowed:
                 return HttpResponse(
-                    status=403, content="Method not allowed for this role"
+                    status=403,
+                    content="Method not allowed for channel scopes",
                 )
 
-        # Check entitlements for calendar creation (all auth methods)
-        if request.method in ("MKCALENDAR", "MKCOL"):
-            if denied := self._check_entitlements_for_creation(effective_user):
+        # Calendar lifecycle is gated by the entitlement. Object-level
+        # DELETE/MOVE (events, ending in .ics) is unrestricted — losing
+        # an entitlement must never strand a user with events they can't
+        # remove or reorganize. Collection DELETE is the canonical
+        # destructive lifecycle op and gets the gate.
+        #
+        # Collection MOVE is included defensively even though SabreDAV
+        # doesn't currently support it (calendar rename is done via
+        # PROPPATCH on displayname, not MOVE). If a future plugin or
+        # SabreDAV release ever made collection MOVE work, it would be a
+        # destructive lifecycle op too — gating it here means we don't
+        # have to remember to add the gate at that point.
+        is_collection_delete = request.method == "DELETE" and is_collection
+        is_collection_move = request.method == "MOVE" and is_collection
+        if (
+            request.method in ("MKCALENDAR", "MKCOL")
+            or is_collection_delete
+            or is_collection_move
+        ):
+            if denied := self._check_entitlements_for_calendar_management(
+                effective_user
+            ):
                 return denied
 
-        # Build the CalDAV server URL
-        path = kwargs.get("path", "")
-
-        # Validate path to prevent traversal attacks
         if not validate_caldav_proxy_path(path):
             return HttpResponse(status=400, content="Invalid path")
 
-        # Enforce channel path scope
         if channel and not self._check_channel_path_access(channel, path):
             return HttpResponse(status=403, content="Path not allowed for this channel")
 
         http = CalDAVHTTPClient()
 
-        # Build target URL
         clean_path = path.lstrip("/") if path else ""
-        if clean_path:
-            target_url = http.build_url(clean_path)
-        else:
-            target_url = http.build_url("")
+        target_url = http.build_url(clean_path)
 
-        # Prepare headers — start with shared auth headers, add proxy-specific ones
         try:
             headers = CalDAVHTTPClient.build_base_headers(effective_user)
         except ValueError:
@@ -200,23 +322,11 @@ class CalDAVProxyView(View):
                 status=500, content="CalDAV authentication not configured"
             )
 
-        # Pass channel ID for audit tracking on CalDAV writes.
-        # Uses the X-LS-* prefix like every other internal proxy→
-        # SabreDAV header so the defensive HTTP_X_LS_* strip above
-        # cannot be subverted by a client smuggling its own value.
         if channel:
             headers["X-LS-Channel-Id"] = str(channel.pk)
 
         headers["Content-Type"] = request.content_type or "application/xml"
-        # Note: X-LS-User is set by build_base_headers() above and
-        # doubles as the audit principal — AuditContextPlugin reads
-        # the same header for setCurrentPrincipal(). One header,
-        # one source of "who is acting".
 
-        # No Basic Auth - our custom backend uses X-LS-User header and API key
-        auth = None
-
-        # Copy relevant headers from the original request
         if "HTTP_DEPTH" in request.META:
             headers["Depth"] = request.META["HTTP_DEPTH"]
         if "HTTP_IF_MATCH" in request.META:
@@ -225,13 +335,50 @@ class CalDAVProxyView(View):
             headers["If-None-Match"] = request.META["HTTP_IF_NONE_MATCH"]
         if "HTTP_PREFER" in request.META:
             headers["Prefer"] = request.META["HTTP_PREFER"]
+        # NOTE: Destination/Overwrite forwarding below is gated on MOVE
+        # specifically. If COPY is ever added to ALLOWED_PROXY_METHODS,
+        # this gate must be widened to ("MOVE", "COPY") — otherwise COPY
+        # would forward without the public→upstream URL rewrite and
+        # SabreDAV would either fail or interpret a public-host URL as
+        # remote, depending on deploy.
+        if request.method == "MOVE" and "HTTP_OVERWRITE" in request.META:
+            headers["Overwrite"] = request.META["HTTP_OVERWRITE"]
+        if request.method == "MOVE" and "HTTP_DESTINATION" in request.META:
+            # Translate the public Destination URL to the upstream CalDAV URL.
+            # The client sends an absolute URL pointing at this proxy
+            # (e.g. http://host/caldav/calendars/.../x.ics); SabreDAV expects
+            # a URL on its own server. We extract the path and rebuild it
+            # against the upstream base. Validate the path to avoid
+            # smuggling traversal/internal-api targets via the header.
+            dest_path = urlparse(request.META["HTTP_DESTINATION"]).path
+            if dest_path.startswith("/caldav/"):
+                dest_clean_path = dest_path[len("/caldav/") :]
+            elif dest_path.startswith("/caldav"):
+                dest_clean_path = dest_path[len("/caldav") :].lstrip("/")
+            else:
+                dest_clean_path = dest_path.lstrip("/")
+            # An empty/root destination is meaningless for MOVE on an
+            # event resource and would let callers smuggle a relocation
+            # to the upstream calendar root past the prefix allowlist.
+            if not dest_clean_path:
+                return HttpResponse(status=400, content="Invalid destination")
+            if not validate_caldav_proxy_path(dest_clean_path):
+                return HttpResponse(status=400, content="Invalid destination")
+            # Channel scope must contain the destination just like the
+            # source. Without this, a CALENDAR-scoped channel could MOVE
+            # an event out of its scoped calendar into another calendar
+            # of the same user. MOVE isn't in any channel scope today
+            # (it 403s earlier at the method-allowlist gate), but the
+            # check is required the moment that changes.
+            if channel and not self._check_channel_path_access(
+                channel, dest_clean_path
+            ):
+                return HttpResponse(status=403, content="Forbidden destination")
+            headers["Destination"] = http.build_url(dest_clean_path)
 
-        # Get request body
         body = request.body if request.body else None
 
         try:
-            # Forward the request to CalDAV server
-            # CalDAV server authenticates via X-LS-User header and API key
             logger.debug(
                 "Forwarding %s request to CalDAV server: %s (user: %s)",
                 request.method,
@@ -243,12 +390,10 @@ class CalDAVProxyView(View):
                 url=target_url,
                 headers=headers,
                 data=body,
-                auth=auth,
                 timeout=CalDAVHTTPClient.DEFAULT_TIMEOUT,
                 allow_redirects=False,
             )
 
-            # Log CalDAV proxy details for debugging
             if response.status_code == 401:
                 logger.warning(
                     "CalDAV server returned 401 for user %s at %s",
@@ -257,7 +402,8 @@ class CalDAVProxyView(View):
                 )
             if request.method == "PROPFIND":
                 logger.debug(
-                    "CalDAV PROPFIND %s -> %s (status=%s, body_len=%d, content_type=%s)",
+                    "CalDAV PROPFIND %s -> %s (status=%s, body_len=%d,"
+                    " content_type=%s)",
                     target_url,
                     effective_user.email,
                     response.status_code,
@@ -265,14 +411,12 @@ class CalDAVProxyView(View):
                     response.headers.get("Content-Type", "?"),
                 )
 
-            # Build Django response
             django_response = HttpResponse(
                 content=response.content,
                 status=response.status_code,
                 content_type=response.headers.get("Content-Type", "application/xml"),
             )
 
-            # Copy relevant headers from CalDAV server response
             for header in ["ETag", "DAV", "Allow", "Location"]:
                 if header in response.headers:
                     django_response[header] = response.headers[header]
