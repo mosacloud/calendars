@@ -95,6 +95,9 @@ db.sqlite3
 # Various
 .turbo
 
+# Local Claude context (Mosa fork, not for upstream)
+CLAUDE.local.md
+
 # OpenSpec
 openspec/
 .claude/
