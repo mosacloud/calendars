@@ -6,45 +6,48 @@ services:
     command: ["python manage.py runserver 0.0.0.0:8000"]
     userns_mode: keep-id
     environment:
-      - DJANGO_CONFIGURATION=MosaCloud
+      - DJANGO_CONFIGURATION=Development
     volumes:
-      - ./src/backend:/app:Z
-      - ./data/static:/data/static:Z
-      - ./data/translations.json:/data/translations.json:Z
+      - ./src/backend:/app:z
+      - ./data/static:/data/static:z
+      - ./data/translations.json:/data/translations.json:z
       - /app/.venv
-    depends_on:
-      postgresql:
-        condition: service_healthy
-        restart: true
-      redis:
-        condition: service_started
-      celery-dev:
-        condition: service_started
-      caldav:
-        condition: service_started
 
-  celery-dev:
+  worker-dev:
     entrypoint: ["/bin/sh", "-c"]
     command: ["celery -A calendars.celery_app worker -l DEBUG"]
     userns_mode: keep-id
     environment:
-      - DJANGO_CONFIGURATION=MosaCloud
+      - DJANGO_CONFIGURATION=Development
     volumes:
-      - ./src/backend:/app:Z
-      - ./data/static:/data/static:Z
-      - ./data/translations.json:/data/translations.json:Z
+      - ./src/backend:/app:z
+      - ./data/static:/data/static:z
+      - ./data/translations.json:/data/translations.json:z
       - /app/.venv
 
   frontend-dev:
     userns_mode: keep-id
     volumes:
-      - ./src/frontend/:/home/frontend/:Z
+      - ./src/frontend/:/home/frontend/:z
       - /home/frontend/node_modules
       - /home/frontend/apps/calendars/node_modules
 
+  postgresql:
+    volumes:
+      - ./docker/postgresql/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro,z
+
+  backend-test:
+    entrypoint: ["/bin/sh", "-c"]
+    userns_mode: keep-id
+    volumes:
+      - ./src/backend:/app:z
+      - ./data/static:/data/static:z
+      - ./src/frontend/apps/calendars/src/features/i18n/translations.json:/data/translations.json:ro,z
+      - /app/.venv
+
   caldav:
     volumes:
-      - ./docker/sabredav/server.php:/var/www/sabredav/server.php:Z
-      - ./docker/sabredav/src:/var/www/sabredav/src:Z
-      - ./docker/sabredav/sql:/var/www/sabredav/sql:Z
-      - ./docker/sabredav/init-database.sh:/usr/local/bin/init-database.sh:Z
+      - ./src/caldav/server.php:/var/www/sabredav/server.php:z
+      - ./src/caldav/src:/var/www/sabredav/src:z
+      - ./src/caldav/sql:/var/www/sabredav/sql:z
+      - ./src/caldav/init-database.sh:/usr/local/bin/init-database.sh:z
