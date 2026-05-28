@@ -416,6 +416,7 @@
         "invitation": {
           "title": "Event invitation",
           "heading": "Event invitation",
+          "badge": "Event invitation",
           "body": "{{organizer}} invites you to an event"
         },
         "update": {
@@ -433,6 +434,7 @@
         "reply": {
           "title": "Event reply",
           "heading": "Reply received",
+          "badge": "Response",
           "body": "{{attendee}} has replied to your event"
         },
         "labels": {
@@ -1336,6 +1338,7 @@
         "invitation": {
           "title": "Invitation à un événement",
           "heading": "Invitation à un événement",
+          "badge": "Invitation à un événement",
           "body": "{{organizer}} vous invite à un événement"
         },
         "update": {
@@ -1353,6 +1356,7 @@
         "reply": {
           "title": "Réponse à l'événement",
           "heading": "Réponse reçue",
+          "badge": "Réponse",
           "body": "{{attendee}} a répondu à votre événement"
         },
         "labels": {
@@ -1998,6 +2002,7 @@
         "invitation": {
           "title": "Uitnodiging voor evenement",
           "heading": "Uitnodiging voor evenement",
+          "badge": "Uitnodiging voor evenement",
           "body": "{{organizer}} nodigt u uit voor een evenement"
         },
         "update": {
@@ -2015,6 +2020,7 @@
         "reply": {
           "title": "Antwoord op evenement",
           "heading": "Antwoord ontvangen",
+          "badge": "Antwoord",
           "body": "{{attendee}} heeft gereageerd op uw evenement"
         },
         "labels": {
