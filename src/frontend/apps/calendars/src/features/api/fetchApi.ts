@@ -20,12 +20,30 @@ export const SESSION_STORAGE_REDIRECT_AFTER_LOGIN_URL =
 /**
  * Redirect to the login page, saving the current URL for post-login redirect.
  * Called on any 401 response to handle expired sessions.
+ *
+ * Idempotent — if several concurrent requests all return 401 (e.g. multiple
+ * React Query refetches on window focus), only the first call actually
+ * persists the URL and triggers navigation; later calls are no-ops so the
+ * stored `redirect_after_login_url` doesn't get overwritten by whatever
+ * the URL happens to be mid-navigation.
  */
+let redirectInFlight = false;
 export function redirectToLogin() {
-  sessionStorage.setItem(
-    SESSION_STORAGE_REDIRECT_AFTER_LOGIN_URL,
-    window.location.href,
-  );
+  if (redirectInFlight) return;
+  redirectInFlight = true;
+  // Persisting the current URL is best-effort: Safari Private Browsing,
+  // a full storage quota, or a `SecurityError` from a sandboxed context
+  // can all throw here. Treat that as "we just won't restore the URL
+  // after login" — never let it suppress the actual navigation, which
+  // is what unsticks the session.
+  try {
+    sessionStorage.setItem(
+      SESSION_STORAGE_REDIRECT_AFTER_LOGIN_URL,
+      window.location.href,
+    );
+  } catch {
+    // intentionally swallow — the redirect itself is what matters.
+  }
   window.location.replace(new URL("authenticate/", baseApiUrl()).href);
 }
 
