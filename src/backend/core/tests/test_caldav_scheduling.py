@@ -1,9 +1,10 @@
 """Tests for CalDAV scheduling callback integration."""
 
-# pylint: disable=no-member,redefined-outer-name,unsubscriptable-object
+# pylint: disable=no-member,redefined-outer-name,unsubscriptable-object,too-many-lines
 
 import http.server
 import logging
+import re
 import secrets
 import socket
 import threading
@@ -36,12 +37,17 @@ class CallbackHandler(http.server.BaseHTTPRequestHandler):
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length) if content_length > 0 else b""
 
-        # Store callback data
-        self.callback_data["called"] = True
-        self.callback_data["request_data"] = {
+        # Store callback data. ``request_data`` keeps the LAST request for
+        # the single-recipient tests; ``requests`` accumulates ALL POSTs so
+        # multi-recipient tests can verify the fan-out (SabreDAV emits one
+        # iTip schedule() per recipient, so we expect one POST per attendee).
+        record = {
             "headers": dict(self.headers),
             "body": body.decode("utf-8", errors="ignore") if body else "",
         }
+        self.callback_data["called"] = True
+        self.callback_data["request_data"] = record
+        self.callback_data.setdefault("requests", []).append(record)
 
         # Send success response
         self.send_response(200)
@@ -53,13 +59,34 @@ class CallbackHandler(http.server.BaseHTTPRequestHandler):
         """Suppress default logging."""
 
 
+def _wait_for_callbacks(callback_data, expected_count=1, timeout=5.0, interval=0.05):
+    """Poll until ``callback_data['requests']`` has at least ``expected_count``
+    entries, bounded by ``timeout``. Returns silently in either case — the
+    caller asserts the count afterward.
+
+    Why polling instead of ``time.sleep(2)``: SabreDAV's iTip dispatch is
+    typically <100ms but a fixed 2s sleep both slows the suite and is
+    still racy on a loaded CI runner. Polling at 50ms intervals returns
+    as soon as the callbacks land and gives up to 5s of grace before
+    declaring failure. For tests that expect ZERO callbacks (e.g.
+    spoofing rejection), pass ``expected_count=1`` with a short timeout
+    — the helper returns cleanly on timeout and the caller asserts that
+    ``requests`` is still empty.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if len(callback_data.get("requests", [])) >= expected_count:
+            return
+        time.sleep(interval)
+
+
 def create_test_server() -> tuple:
     """Create a test HTTP server that captures callbacks.
 
     Returns:
         Tuple of (server, port, callback_data)
     """
-    callback_data = {"called": False, "request_data": None}
+    callback_data = {"called": False, "request_data": None, "requests": []}
 
     def handler_factory(*args, **kwargs):
         return CallbackHandler(callback_data, *args, **kwargs)
@@ -155,9 +182,7 @@ END:VCALENDAR"""
                 # Save event to trigger scheduling
                 caldav_calendar.save_event(ical_content)
 
-                # Give the callback a moment to be called (scheduling may be async)
-                # sabre/dav processes scheduling synchronously during the request
-                time.sleep(2)
+                _wait_for_callbacks(callback_data, expected_count=1)
 
                 # Verify callback was called
                 assert callback_data["called"], (
@@ -242,6 +267,110 @@ END:VCALENDAR"""
             server.shutdown()
             server.server_close()
 
+    def test_scheduling_callback_fires_once_per_external_attendee(  # pylint: disable=too-many-locals,too-many-statements
+        self,
+    ):
+        """Creating an event with TWO external attendees must trigger
+        TWO separate scheduling callbacks — one per recipient.
+
+        Reproduces a production report where only one of two invited
+        externals received an email. The full chain is
+        SabreDAV ``Schedule\\Plugin`` → iTip Broker (one Message per
+        attendee) → ``HttpCallbackIMipPlugin::schedule()`` (called once
+        per Message) → Django callback (one POST per Message). If
+        SabreDAV's broker silently collapses the fan-out, or if our
+        plugin only forwards the first, this test catches it before
+        the downstream Messages-API step ever runs.
+        """
+        organizer = factories.UserFactory(email="organizer-multi@example.com")
+        service = CalendarService()
+        caldav_path = service.create_calendar(
+            organizer, name="Multi Attendee Calendar", color="#00aaff"
+        )
+
+        server, _port, callback_data = create_test_server()
+        server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        server_thread.start()
+        time.sleep(0.5)
+
+        try:
+            client = service._get_client(organizer)  # pylint: disable=protected-access
+            calendar_url = service._calendar_url(caldav_path)  # pylint: disable=protected-access
+
+            try:
+                caldav_calendar = client.calendar(url=calendar_url)
+
+                dtstart = datetime.now() + timedelta(days=2)
+                dtend = dtstart + timedelta(hours=1)
+
+                # Two clearly-external attendees (no principal in the
+                # CalDAV server). Distinct domains so we can't be fooled
+                # by accidental dedup on domain or local-part.
+                attendee_a = "alice@external-a.test"
+                attendee_b = "bob@external-b.test"
+
+                ical_content = f"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test Client//EN
+BEGIN:VEVENT
+UID:multi-attendee-{datetime.now().timestamp()}
+DTSTART:{dtstart.strftime("%Y%m%dT%H%M%SZ")}
+DTEND:{dtend.strftime("%Y%m%dT%H%M%SZ")}
+SUMMARY:Event with Two External Attendees
+ORGANIZER;CN=Organizer:mailto:{organizer.email}
+ATTENDEE;CN=Alice;RSVP=TRUE:mailto:{attendee_a}
+ATTENDEE;CN=Bob;RSVP=TRUE:mailto:{attendee_b}
+END:VEVENT
+END:VCALENDAR"""
+
+                caldav_calendar.save_event(ical_content)
+
+                _wait_for_callbacks(callback_data, expected_count=2)
+
+                requests = callback_data["requests"]
+                assert len(requests) == 2, (
+                    f"Expected 2 scheduling callbacks (one per external "
+                    f"attendee), got {len(requests)}. "
+                    f"Recipients seen: "
+                    f"{[r['headers'].get('X-LS-Recipient') for r in requests]}. "
+                    "If this is 1, SabreDAV's iTip broker is not fanning out "
+                    "or HttpCallbackIMipPlugin is dropping the second message — "
+                    "either way the second attendee will never receive an email."
+                )
+
+                methods = {r["headers"].get("X-LS-Method", "") for r in requests}
+                assert methods == {"REQUEST"}, (
+                    f"All callbacks should carry METHOD=REQUEST, got {methods}"
+                )
+
+                recipients = {
+                    re.sub(r"(?i)^mailto:", "", r["headers"].get("X-LS-Recipient", ""))
+                    for r in requests
+                }
+                assert recipients == {attendee_a, attendee_b}, (
+                    f"Callback recipients {recipients} do not match the two "
+                    f"external attendees {{{attendee_a!r}, {attendee_b!r}}}"
+                )
+
+                # Each POST should carry the full iCalendar payload (per
+                # RFC 6638, the per-recipient iTip message still lists all
+                # attendees — what differs is the X-LS-Recipient header).
+                for r in requests:
+                    body = r["body"]
+                    normalized = body.replace("\r\n ", "").replace("\r\n\t", "")
+                    normalized = normalized.replace("\n ", "").replace("\n\t", "")
+                    assert "BEGIN:VCALENDAR" in normalized
+                    assert attendee_a in normalized
+                    assert attendee_b in normalized
+
+            except NotFoundError:
+                pytest.skip("Calendar not found - CalDAV server may not be running")
+            except Exception as e:  # noqa: BLE001  # pylint: disable=broad-exception-caught
+                pytest.fail(f"Failed to create multi-attendee event: {e}")
+        finally:
+            server.shutdown()
+            server.server_close()
+
     def test_scheduling_callback_fires_cancel_when_deleting_event_with_attendee(  # pylint: disable=too-many-locals,too-many-statements
         self,
     ):
@@ -294,7 +423,7 @@ END:VCALENDAR"""
 
                 # Wait for and assert the REQUEST callback (sanity check —
                 # the same path the cancel relies on).
-                time.sleep(2)
+                _wait_for_callbacks(callback_data, expected_count=1)
                 assert callback_data["called"], (
                     "REQUEST callback should fire on event creation"
                 )
@@ -302,18 +431,19 @@ END:VCALENDAR"""
                     callback_data["request_data"]["headers"]["X-LS-Method"] == "REQUEST"
                 )
 
-                # Reset so we can observe what (if anything) DELETE triggers.
+                # Reset all three so we can observe what (if anything) DELETE
+                # triggers — ``requests`` is reset too so the next
+                # ``_wait_for_callbacks`` polls for the post-delete count.
                 callback_data["called"] = False
                 callback_data["request_data"] = None
+                callback_data["requests"] = []
 
                 # Delete the event. SabreDAV's Schedule\\Plugin::beforeUnbind
                 # must turn this into a CANCEL iTIP message and route it
                 # back through our HTTP callback.
                 event.delete()
 
-                # Scheduling is synchronous in SabreDAV; give the callback
-                # POST a beat to land just in case.
-                time.sleep(2)
+                _wait_for_callbacks(callback_data, expected_count=1)
 
                 assert callback_data["called"], (
                     "CANCEL callback was not received after deleting the "
@@ -488,8 +618,7 @@ END:VCALENDAR"""
 
                 caldav_calendar.save_event(ical_content)
 
-                # Wait for callback
-                time.sleep(2)
+                _wait_for_callbacks(callback_data, expected_count=1)
 
                 # 5. Verify callback was called
                 assert callback_data["called"], (
@@ -617,7 +746,9 @@ class TestOrganizerSpoofingRejection:
                 # so long as the callback doesn't fire with the spoof.
                 pass
 
-            time.sleep(2)
+            # Zero callbacks is the expected outcome; a short bounded wait
+            # is enough to catch any rogue ones.
+            _wait_for_callbacks(callback_data, expected_count=1, timeout=2.0)
 
             if callback_data["called"]:
                 sender = callback_data["request_data"]["headers"].get("X-LS-Sender", "")
@@ -656,7 +787,7 @@ class TestOrganizerSpoofingRejection:
 
             ical_content = self._build_event(user.email)
             caldav_calendar.save_event(ical_content)
-            time.sleep(2)
+            _wait_for_callbacks(callback_data, expected_count=1)
             assert callback_data["called"], (
                 "Negative control failed: own-ORGANIZER PUT did not "
                 "trigger the scheduling callback. The spoofing test "
