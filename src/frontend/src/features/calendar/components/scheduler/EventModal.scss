@@ -1,0 +1,344 @@
+.event-modal {
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  // Footer shared by the section pills (top) and the action buttons (bottom),
+  // living in the modal's single sticky `actions` slot.
+  &__footer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  &__footer-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+
+    &__right {
+      display: flex;
+      gap: 0.5rem;
+      margin-left: auto;
+    }
+  }
+
+  &__error {
+    color: var(--c--theme--colors--danger-600, #d2212f);
+    font-size: 0.8125rem;
+    margin: -4px 0 8px 36px;
+  }
+
+  &__more-options {
+    border-top: 1px solid #f1f3f4;
+    padding-top: 0.5rem;
+  }
+
+  &__more-options-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    color: #5f6368;
+    transition: background-color 0.15s;
+
+    &:hover {
+      background-color: #f8f9fa;
+    }
+
+    svg {
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  &__more-options-content {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e8eaeb;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+  }
+}
+
+// DateTimeSection layout
+.datetime-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &__inputs {
+    display: flex;
+    gap: 0.5rem;
+    flex: 1;
+  }
+
+  &__arrow {
+    align-self: center;
+    margin: 0 8px;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    color: #888;
+  }
+
+  &__allday {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #5f6368;
+    cursor: pointer;
+  }
+}
+
+@media (max-width: 768px) {
+  .datetime-section__inputs {
+    flex-direction: column;
+  }
+
+  .datetime-section__arrow {
+    display: none;
+  }
+}
+
+// VideoConferenceSection layout
+.video-conference-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  &__link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  &__remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #5f6368;
+    flex-shrink: 0;
+
+    &:hover {
+      background-color: #f1f3f4;
+    }
+
+    svg {
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
+
+// RemindersSection layout
+.reminders-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #5f6368;
+    flex-shrink: 0;
+
+    &:hover {
+      background-color: #f1f3f4;
+    }
+
+    svg {
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
+
+// AttachmentsSection layout
+.attachments-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.5rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+    font-size: 0.8125rem;
+
+    // The leading file icon — keep it in line with other list-item
+    // icons rather than the default 24px. Covers both a ui-kit SVG and
+    // a font-based <Icon> (.material-icons span).
+    > svg {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      color: #5f6368;
+    }
+
+    > .material-icons {
+      font-size: 20px;
+      flex-shrink: 0;
+      color: #5f6368;
+    }
+  }
+
+  &__info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #202124;
+  }
+
+  &__size {
+    color: #5f6368;
+    font-size: 0.75rem;
+  }
+
+  &__remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #5f6368;
+    flex-shrink: 0;
+
+    &:hover {
+      background-color: #e8eaeb;
+    }
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+}
+
+// VisibilitySection — a dropdown plus a one-line description of the
+// selected level (because "Public" only means "everyone this calendar
+// is shared with", not the wider world).
+.visibility-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+
+  &__help {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #5f6368;
+  }
+}
+
+// CalendarSelect
+.calendar-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  &__color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  &__option {
+    // Block-level flex (not inline-flex): inline-flex sits on the text
+    // baseline inside the select's value box and lands ~0.5px high;
+    // block flex centres in the box's full height.
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+// Let our custom event-modal footer span the full width of cunningham's footer
+// slot, and drop the default sticky-footer divider line (the "HR").
+.c__modal__footer:has(.event-modal__footer) {
+  border-top: none;
+  // The sticky footer is a full-width child flush with the modal's bottom edge;
+  // its square background would otherwise paint over the modal's rounded bottom
+  // corners (border-radius doesn't clip child backgrounds).
+  border-bottom-left-radius: var(--c--components--modal--border-radius);
+  border-bottom-right-radius: var(--c--components--modal--border-radius);
+}
+.c__modal__footer__left:has(.event-modal__footer) {
+  flex: 1;
+  width: 100%;
+}
+
+// Pin the modal title to the top of the scroller while the fields scroll (the
+// close "X" is already sticky in cunningham). The opaque background hides
+// fields scrolling underneath. No z-index, so it sits above the static fields
+// but below the sticky close button (which keeps the X clickable).
+.c__modal__scroller:has(.event-modal__content) .c__modal__title {
+  position: sticky;
+  top: 0;
+  // Solid modal-coloured fill. `padding-bottom` covers the gap down to the
+  // first field; the `box-shadow` paints the same fill upward over the
+  // scroller's top padding so no field content shows above the title while
+  // scrolling. Using box-shadow (not margin) keeps the title's box unchanged,
+  // so it never overlaps the first field. z-index sits above the fields (some
+  // sections, e.g. AttendeesInput, use z-index up to 10) so they scroll under
+  // the title, while the close button is lifted above it (below) so the X
+  // stays clickable.
+  background-color: var(--c--components--modal--background-color, #fff);
+  margin-bottom: 0;
+  padding-bottom: var(--c--globals--spacings--base, 0.75rem);
+  box-shadow: 0 calc(-1 * var(--c--globals--spacings--md, 1rem)) 0 0
+    var(--c--components--modal--background-color, #fff);
+  z-index: 11;
+}
+.c__modal__scroller:has(.event-modal__content) .c__modal__close {
+  z-index: 12;
+}

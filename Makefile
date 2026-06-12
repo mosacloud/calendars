@@ -168,16 +168,20 @@ analyze-back: ## lint all back-end python sources with pylint
 	@$(COMPOSE_RUN_APP_NO_DEPS) pylint .
 .PHONY: analyze-back
 
-lint-front: ## run the frontend linter
-	@$(COMPOSE) run --rm frontend-dev sh -c "cd apps/calendars && npm run lint"
+lint-front: ## format then run the frontend linter (oxfmt + oxlint)
+	@$(COMPOSE) run --rm frontend-dev sh -c "pnpm run format && pnpm run lint"
 .PHONY: lint-front
 
+format-front: ## format front-end sources with oxfmt
+	@$(COMPOSE) run --rm frontend-dev sh -c "pnpm run format"
+.PHONY: format-front
+
 typecheck-front: ## run the frontend type checker
-	@$(COMPOSE) run --rm frontend-dev sh -c "cd apps/calendars && npm run ts:check"
+	@$(COMPOSE) run --rm frontend-dev sh -c "pnpm run ts:check"
 .PHONY: typecheck-front
 
 analyze-front: ## analyze frontend bundle sizes (per-chunk + per-package breakdown)
-	@$(COMPOSE) run --rm frontend-dev sh -c "cd apps/calendars && npm run analyze"
+	@$(COMPOSE) run --rm frontend-dev sh -c "pnpm run analyze"
 .PHONY: analyze-front
 
 # -- Tests
@@ -201,7 +205,7 @@ test-back-parallel: ## run all back-end tests in parallel
 
 test-front: ## run the frontend tests
 	@args="$(filter-out $@,$(MAKECMDGOALS))" && \
-	$(COMPOSE) run --rm frontend-dev sh -c "cd apps/calendars && npm test -- $${args:-${1}}"
+	$(COMPOSE) run --rm frontend-dev sh -c "pnpm test -- $${args:-${1}}"
 .PHONY: test-front
 
 # -- E2E Tests
@@ -230,7 +234,7 @@ start-back-e2e: ## start the backend for e2e tests
 test-e2e: ## run the e2e tests, example: make test-e2e -- --project chromium --headed
 	@$(MAKE) start-back-e2e
 	@args="$(filter-out $@,$(MAKECMDGOALS))" && \
-	cd src/frontend/apps/e2e && npm test $${args:-${1}}
+	cd src/e2e && npm test $${args:-${1}}
 .PHONY: test-e2e
 
 # -- Backend
@@ -290,13 +294,14 @@ demo: ## flush db then create a demo
 
 # -- Frontend
 
-install-front: ## install the frontend dependencies
-	@$(COMPOSE) run --rm frontend-dev sh -c "npm install"
+install-front: ## install frontend deps and (re)generate pnpm-lock.yaml
+	@$(COMPOSE) run --rm -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 node \
+		sh -c "cd /app/src/frontend && corepack pnpm install"
 .PHONY: install-front
 
-install-frozen-front: ## install frontend dependencies from lockfile
-	@echo "Installing frontend dependencies..."
-	@$(COMPOSE) run --rm frontend-dev sh -c "npm ci"
+install-frozen-front: ## install frontend deps strictly from the committed lockfile
+	@$(COMPOSE) run --rm -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 node \
+		sh -c "cd /app/src/frontend && corepack pnpm install --frozen-lockfile"
 .PHONY: install-frozen-front
 
 shell-front: ## open a shell in the frontend container
@@ -311,7 +316,7 @@ clean-front: ## reset the frontend node_modules volumes (run after dep changes)
 
 fake-messages: ## start a fake Messages API server on port 8940
 	@echo "$(BOLD)Starting fake Messages API server...$(RESET)"
-	@python3 scripts/fake_messages_server.py
+	@python3 bin/fake_messages_server.py
 .PHONY: fake-messages
 
 clean: ## restore repository state as it was freshly cloned

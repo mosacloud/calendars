@@ -1,0 +1,63 @@
+.calendar-left-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--c--theme--colors--greyscale-000);
+
+  overflow-y: auto;
+
+  &__create {
+    padding: 0.75rem 0.75rem;
+
+    .c__button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  .mini-calendar {
+    width: 100%;
+    max-width: 280px;
+    align-self: center;
+    flex-shrink: 0;
+  }
+
+  &__divider {
+    height: 1px;
+    background-color: var(--c--theme--colors--greyscale-200);
+    margin: 0.5rem 0.75rem;
+    flex-shrink: 0;
+  }
+
+  &__mobile-nav {
+    display: flex;
+    flex-direction: column;
+    padding: 0 0.5rem 1rem;
+    gap: 0.125rem;
+  }
+
+  &__mobile-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9375rem;
+    color: var(--c--theme--colors--greyscale-700);
+    text-align: left;
+
+    &:hover {
+      background-color: var(--c--theme--colors--greyscale-100);
+    }
+
+    // The mobile-nav items render ui-kit SVG icons (<Clock/>, <Building/>,
+    // <Puzzle/>), not the material-icons font glyph — target the <svg>.
+    svg {
+      font-size: 1.25rem;
+      color: var(--c--theme--colors--greyscale-600);
+    }
+  }
+}

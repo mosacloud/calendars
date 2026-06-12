@@ -1,0 +1,330 @@
+// =============================================================================
+// EventCalendar Theme Override
+// Aligns @event-calendar/core with La Suite design system (Cunningham)
+// =============================================================================
+
+@use "sass:map";
+@use "@/styles/cunningham-tokens-sass" as *;
+
+$tablet: map.get($themes, "default", "globals", "breakpoints", "tablet");
+
+// -----------------------------------------------------------------------------
+// 1. CSS Variables - Map --ec-* to Cunningham tokens
+// -----------------------------------------------------------------------------
+.ec {
+  // Fill parent container to enable proper scrolling and sticky header
+  height: 100%;
+
+  // Base colors
+  --ec-bg-color: var(--c--globals--colors--gray-000);
+  --ec-day-bg-color: var(--c--contextuals--background--surface--secondary);
+  --ec-text-color: var(--c--globals--colors--gray-800);
+  --ec-border-color: var(--c--globals--colors--gray-100);
+
+  // Buttons (if any native buttons remain visible)
+  --ec-button-bg-color: var(--c--globals--colors--gray-000);
+  --ec-button-border-color: var(--c--globals--colors--gray-200);
+  --ec-button-text-color: var(--c--globals--colors--gray-800);
+  --ec-button-active-bg-color: var(--c--globals--colors--gray-100);
+  --ec-button-active-border-color: var(--c--globals--colors--gray-300);
+
+  // Today & highlight
+  --ec-today-bg-color: transparent;
+  --ec-highlight-color: var(--c--globals--colors--brand-050);
+
+  // Events
+  --ec-event-text-color: #fff;
+
+  // Now indicator
+  --ec-now-indicator-color: var(--c--globals--colors--brand-500);
+
+  border: none !important;
+}
+
+.ec-day {
+  &.ec-today {
+    --ec-day-bg-color: var(--c--contextuals--background--surface--secondary) !important;
+  }
+}
+
+.ec-col-group,
+.ec-col-head {
+  &.ec-today {
+    background-color: var(--c--contextuals--background--surface--secondary) !important;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 2. Hide native toolbar (using custom React toolbar)
+// -----------------------------------------------------------------------------
+.ec-toolbar {
+  display: none !important;
+}
+
+.ec-main {
+  border: none !important;
+}
+// -----------------------------------------------------------------------------
+// 3. Column headers - Unified header zone with bottom shadow
+// -----------------------------------------------------------------------------
+
+// Remove borders from col-head to create unified look
+.ec-col-head {
+  border: none !important;
+  background-color: transparent;
+  time {
+    .day-of-month {
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 3px 0px;
+      display: inline-block;
+    }
+  }
+
+  &.ec-today {
+    // Frame around the day number
+    time {
+      .day-of-month {
+        padding: 3px 5px;
+        border: 1px solid var(--c--contextuals--border--semantic--neutral--secondary);
+      }
+    }
+  }
+}
+
+// Remove borders from all-day section
+.ec-all-day {
+  border: none !important;
+
+  // Target cells inside all-day
+  > * {
+    border: none !important;
+  }
+
+  // Remove right border from all days in all-day section
+  .ec-day {
+    border-inline-end: none !important;
+    border-right: none !important;
+  }
+}
+
+// Add shadow to the header section
+.ec-header {
+  // box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  z-index: 3;
+
+  // Sidebar in header: no border, no text
+  .ec-sidebar {
+    border: none !important;
+    font-size: 0;
+    color: transparent;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 4. Events styling - Custom duration-aware content (see utils/eventContent.ts)
+// -----------------------------------------------------------------------------
+.ec-event {
+  border-radius: 6px;
+  box-shadow: none;
+  overflow: hidden;
+
+  padding-left: 4px !important;
+
+  // Compact (≤ 30 min): vertically center the single line
+  &:has(.ec-custom--compact) {
+    display: flex;
+    align-items: center;
+  }
+
+  // Medium / large: small top padding
+  &:has(.ec-custom--medium),
+  &:has(.ec-custom--large) {
+    padding-top: 2px;
+  }
+}
+
+.ec-event-body {
+  overflow: hidden;
+  width: 100%;
+}
+
+// --- Shared custom-content styles ---
+.ec-custom__title {
+  font-weight: 600;
+}
+
+.ec-custom__details,
+.ec-custom__time {
+  font-weight: 400;
+  opacity: 0.9;
+}
+
+// --- Compact: ≤ 30 min — single line ---
+.ec-custom--compact {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+// --- Medium: 45–60 min — two truncated lines ---
+.ec-custom--medium {
+  overflow: hidden;
+  font-size: 0.8rem;
+  line-height: 1.3;
+
+  .ec-custom__title,
+  .ec-custom__details {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+  }
+}
+
+// --- Large: 75 min+ — title wraps up to 2 lines, then details ---
+.ec-custom--large {
+  overflow: hidden;
+  font-size: 0.85rem;
+  line-height: 1.35;
+
+  .ec-custom__title {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .ec-custom__details {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+    margin-top: 1px;
+  }
+}
+
+// --- All-day events ---
+.ec-custom--allday {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+// -----------------------------------------------------------------------------
+// 5. Now indicator - Color only (shape is already good in the lib)
+// -----------------------------------------------------------------------------
+// Color is set via --ec-now-indicator-color variable above
+
+// -----------------------------------------------------------------------------
+// 6. Sidebar (hours) - Smaller, discrete style
+// -----------------------------------------------------------------------------
+.ec-sidebar {
+  font-size: 0.75rem;
+  color: var(--c--globals--colors--gray-500);
+}
+
+// -----------------------------------------------------------------------------
+// 7. Grid lines - Remove intermediate lines, keep only hourly lines
+// -----------------------------------------------------------------------------
+.ec-day {
+  .ec-time-grid .ec-body & {
+    // Override to remove intermediate (30-min) lines
+    // Keep only: bottom mask, hourly lines, vertical line
+    background-image:
+      linear-gradient(to top, var(--ec-day-bg-color) 1px, transparent 1px),
+      linear-gradient(to top, var(--ec-border-color) 1px, transparent 1px),
+      linear-gradient(to right, var(--ec-day-bg-color) 1px, transparent 1px) !important;
+    background-size:
+      100% 100%,
+      100% calc(var(--ec-slot-height) * var(--ec-slot-label-periodicity)),
+      2px 100%;
+  }
+}
+
+.ec-sidebar {
+  .ec-time-grid .ec-body & {
+    background-image: none !important;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 8. Grid in body - Add bottom border
+// -----------------------------------------------------------------------------
+.ec-body {
+  .ec-grid {
+    border-bottom: 1px solid var(--ec-border-color);
+    border-right: 1px solid var(--ec-border-color);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 9. Mobile adjustments.
+// (a) 1-day view: hide the library's native day-name row and the empty
+//     top-left sidebar cell — the custom WeekDayBar above the grid plays
+//     that role instead. The `.ec-all-day` lane is a sibling under
+//     `.ec-header` and must stay visible, so the selectors target direct
+//     children only.
+// (b) Multi-day views (Work week / Week): the WeekDayBar is not rendered;
+//     the native per-column headers stay so each one aligns vertically
+//     with its day column, matching desktop.
+// (c) Today's day-of-month (all multi-day mobile views): marked with a
+//     brand-color pill drawn behind the digit so the layout stays pixel-
+//     stable (the desktop rule's border + extra padding would shift the
+//     column header by ~10 px).
+// -----------------------------------------------------------------------------
+@media (max-width: $tablet) {
+  .scheduler[data-view="timeGridDay"] {
+    .ec-header > .ec-sidebar,
+    .ec-header > .ec-grid {
+      display: none !important;
+    }
+  }
+
+  // Today's day-of-month: drop the framed border + extra padding (they
+  // shift the column header layout) and mark today with a brand-color
+  // pill drawn as a pseudo-element behind the digit. Same idiom as the
+  // 1-day WeekDayBar selected day so the layout stays pixel-stable.
+  // The `time` element also gets a visually-hidden ", today" suffix so
+  // screen readers announce the today semantics — the library doesn't
+  // set aria-current on the header.
+  .ec-col-head.ec-today {
+    time {
+      .day-of-month {
+        padding: 3px 0 !important;
+        border-color: transparent !important;
+        position: relative;
+        color: var(--c--contextuals--content--semantic--neutral--on-neutral);
+        z-index: 1;
+
+        &::before {
+          content: "";
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          background: var(--c--contextuals--background--semantic--brand--primary);
+          z-index: -1;
+        }
+      }
+
+      &::after {
+        content: ", today";
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
+      }
+    }
+  }
+}

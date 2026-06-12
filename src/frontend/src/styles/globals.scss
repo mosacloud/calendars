@@ -1,0 +1,138 @@
+// We deliberately avoid ``@gouvfr-lasuite/ui-kit/sass/fonts`` (the full
+// ui-kit font bundle, ~310 KB) and instead pull only the fonts we need:
+//  - Marianne (text)
+//  - Material Icons Outlined (via cunningham, used by our own UI)
+//  - Material Icons (filled) — REQUIRED by ui-kit's own components
+//    (e.g. ``UserMenu``) which emit ``.material-icons.icon--filled``
+//    spans. Without it those glyphs fall back to literal ligature text
+//    ("arrow_drop_down", "logout", …). It's a single woff2.
+@use "@gouvfr-lasuite/ui-kit/fonts/Marianne";
+@use "@gouvfr-lasuite/cunningham-react/sass/icons";
+@use "@fontsource/material-icons";
+@use "@gouvfr-lasuite/ui-kit/style";
+@use "./cunningham-tokens.css";
+@use "./../features/layouts/components/global/GlobalLayout";
+@use "./../features/feedback/Feedback";
+@use "./../features/layouts/components/header/index";
+@use "./../features/ui/components/toaster";
+@use "./../features/ui/components/generic-disclaimer/GenericDisclaimer";
+@use "./../features/ui/components/spinner/SpinnerPage";
+@use "./../features/ui/components/logo/DynamicCalendarLogo";
+@use "./../features/layouts/components/left-panel/LeftPanelMobile";
+@use "./../features/calendar/components/left-panel/MiniCalendar";
+@use "./../features/calendar/components/calendar-list/CalendarList";
+@use "./../features/calendar/components/left-panel/LeftPanel";
+@use "./../features/calendar/components/scheduler/EventModal";
+@use "./../features/calendar/components/scheduler/RecurrenceEditor";
+@use "./../features/calendar/components/scheduler/AttendeesInput";
+@use "./../features/calendar/components/scheduler/Scheduler";
+@use "./../features/calendar/components/scheduler/scheduler-theme";
+@use "./../features/calendar/components/scheduler/SchedulerToolbar";
+@use "./../features/calendar/components/scheduler/event-modal-sections/SectionRow";
+@use "./../features/calendar/components/scheduler/event-modal-sections/InvitationResponseSection";
+@use "./../features/calendar/components/scheduler/event-modal-sections/SectionPill";
+@use "./../features/calendar/components/scheduler/FreeBusyTimeline";
+@use "./../features/calendar/components/scheduler/mobile/WeekDayBar";
+@use "./../features/calendar/components/scheduler/mobile/MobileToolbar";
+@use "./../features/calendar/components/scheduler/mobile/FloatingActionButton";
+@use "./../features/calendar/components/scheduler/mobile/MobileListView";
+@use "./../features/resources/components/Resources";
+@use "./../features/integrations/components/Integrations";
+@use "./../features/settings/components/WorkingHoursSettings";
+@use "./views/index" as *;
+@use "./views/calendar" as *;
+html,
+body {
+  margin: 0;
+  background-color: var(--c--contextuals--background--surface--primary);
+  color: var(--c--contextuals--content--semantic--neutral--primary);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.p-2xs {
+  padding: var(--c--globals--spacings--2xs);
+}
+
+.p-xs {
+  padding: var(--c--globals--spacings--xs);
+}
+
+.p-sm {
+  padding: var(--c--globals--spacings--sm);
+}
+
+.p-md {
+  padding: var(--c--globals--spacings--md);
+}
+
+.p-base {
+  padding: var(--c--globals--spacings--base);
+}
+
+.lasuite-gaufre-btn--vanilla:before {
+  background-color: var(--c--contextuals--background--semantic--brand--primary) !important;
+}
+
+.c__left-panel {
+  border-right: none;
+}
+.c__modal__backdrop {
+  z-index: 1000;
+}
+
+// The app header is `position: fixed` with a higher z-index than the modal
+// backdrop, so a centered modal taller than the available space rises behind
+// it and hides the top-right close (X) button. Re-center centered modals
+// within the area *below* the header and cap their height to fit there, so
+// their top (and the close button) always stays under the header.
+// Full/tab modals are intentionally full-screen and handled separately.
+.c__modal:not(.c__modal--full):not(.c__modal--tab) {
+  top: calc(50% + var(--header-height) / 2) !important;
+  max-height: calc(100% - var(--header-height) - 4em) !important;
+}
+
+// Full-screen / tab modals (e.g. the mobile event modal) start at the very
+// top by default, putting their close button behind the fixed header. Pin
+// them to fill the area below the header instead.
+.c__modal--full,
+.c__modal--tab {
+  top: var(--header-height) !important;
+  height: calc(100% - var(--header-height)) !important;
+  max-height: calc(100% - var(--header-height)) !important;
+}
+
+.c__datagrid--empty,
+.c__datagrid thead {
+  transition:
+    background-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.c__modal__title {
+  text-align: left;
+  padding: 0;
+  font-size: 1.125rem;
+  margin-bottom: 1rem;
+}
+
+.c__modal__close button {
+  padding: 0;
+  font-size: 88px;
+  top: -5px !important;
+  width: 28px !important;
+  height: 28px;
+}
+
+// Scoped to full-screen modals (mobile event modal uses FULL size)
+.c__modal--full .c__modal__close button {
+  @media (max-width: 768px) {
+    right: 0 !important;
+  }
+}
+
+.c__modal__scroller {
+  padding-top: 1rem;
+}

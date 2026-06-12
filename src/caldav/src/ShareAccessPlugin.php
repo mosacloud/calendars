@@ -145,6 +145,25 @@ class ShareAccessPlugin extends ServerPlugin
         $calendarUri = $parts[3];
         $ownerPrincipal = 'principals/users/' . $ownerEmail;
 
+        // Authorization guard: only the calendar OWNER may reconcile share
+        // levels. SabreDAV's sharing plugin already restricts CS:share to the
+        // owner, but this hook performs its own DB write off the request body
+        // and runs on afterMethod:POST regardless — so it must not depend on
+        // upstream ordering. A sharee (or anyone whose authenticated principal
+        // is not the path owner) must never be able to rewrite share_access_level.
+        $aclPlugin = $this->server->getPlugin('acl');
+        $currentPrincipal = $aclPlugin ? $aclPlugin->getCurrentUserPrincipal() : null;
+        if (!is_string($currentPrincipal)
+            || strtolower(rtrim($currentPrincipal, '/'))
+                !== strtolower(rtrim($ownerPrincipal, '/'))) {
+            error_log(
+                "[ShareAccessPlugin] Refusing share_access_level write: "
+                . "principal " . var_export($currentPrincipal, true)
+                . " is not the calendar owner " . $ownerPrincipal
+            );
+            return;
+        }
+
         try {
             // Parse with a fresh XML service (not the server's, which has
             // element maps that transform CS:share into a Share object).
@@ -226,7 +245,6 @@ class ShareAccessPlugin extends ServerPlugin
                     return null;
                 }
                 $prop = $reflection->getProperty('calendarInfo');
-                $prop->setAccessible(true);
                 $info = $prop->getValue($node);
 
                 // calendarInfo['id'] is [calendarId, instanceId] in SabreDAV
@@ -268,7 +286,6 @@ class ShareAccessPlugin extends ServerPlugin
                     return null;
                 }
                 $prop = $reflection->getProperty('calendarInfo');
-                $prop->setAccessible(true);
                 $info = $prop->getValue($node);
 
                 $calendarId = is_array($info['id']) ? $info['id'][0] : ($info['id'] ?? null);
@@ -329,7 +346,6 @@ class ShareAccessPlugin extends ServerPlugin
                     return null;
                 }
                 $prop = $reflection->getProperty('calendarInfo');
-                $prop->setAccessible(true);
                 $info = $prop->getValue($node);
                 return $info[self::OWNER_TYPE_PROP] ?? null;
             } catch (\Exception $e) {
