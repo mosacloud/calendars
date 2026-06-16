@@ -199,7 +199,7 @@
           "sections": {
             "addRecurrence": "Add recurrence",
             "addLocation": "Add location",
-            "addVideoConference": "Visio",
+            "addVideoConference": "Meet",
             "createVisio": "Add video conference",
             "removeVisio": "Remove video conference",
             "videoLink": "Video conference link",
@@ -1164,7 +1164,7 @@
           "sections": {
             "addRecurrence": "Ajouter une récurrence",
             "addLocation": "Ajouter un lieu",
-            "addVideoConference": "Visio",
+            "addVideoConference": "Meet",
             "createVisio": "Ajouter une visioconférence",
             "removeVisio": "Supprimer la visioconférence",
             "videoLink": "Lien de visioconférence",
@@ -1871,7 +1871,7 @@
           "sections": {
             "addRecurrence": "Herhaling toevoegen",
             "addLocation": "Locatie toevoegen",
-            "addVideoConference": "Visio",
+            "addVideoConference": "Meet",
             "createVisio": "Add video conference",
             "removeVisio": "Videoconferentie verwijderen",
             "videoLink": "Videoconferentie link",
