@@ -69,6 +69,16 @@ FRONTEND_FEEDBACK_MESSAGES_WIDGET_CHANNEL=
 FRONTEND_FEEDBACK_MESSAGES_WIDGET_PATH=
 FRONTEND_MEET_BASE_URL=
 
+# App switcher — set these to enable the app switcher in the header.
+# Leave empty to hide the switcher (no other apps configured).
+APP_URL_EPICENTRE=
+APP_URL_DOCS=
+APP_URL_DRIVE=
+APP_URL_MEET=
+APP_URL_MAIL=
+APP_URL_CHAT=
+APP_URL_COMMANDER=
+
 # Indexer
 
 # Store OIDC tokens in the session

@@ -147,6 +147,17 @@ class Base(Configuration):
     )
     APP_NAME = values.Value("Calendars", environ_name="APP_NAME", environ_prefix=None)
     APP_URL = values.Value("", environ_name="APP_URL", environ_prefix=None)
+    APP_URL_EPICENTRE = values.Value(
+        "", environ_name="APP_URL_EPICENTRE", environ_prefix=None
+    )
+    APP_URL_DOCS = values.Value("", environ_name="APP_URL_DOCS", environ_prefix=None)
+    APP_URL_DRIVE = values.Value("", environ_name="APP_URL_DRIVE", environ_prefix=None)
+    APP_URL_MEET = values.Value("", environ_name="APP_URL_MEET", environ_prefix=None)
+    APP_URL_MAIL = values.Value("", environ_name="APP_URL_MAIL", environ_prefix=None)
+    APP_URL_CHAT = values.Value("", environ_name="APP_URL_CHAT", environ_prefix=None)
+    APP_URL_COMMANDER = values.Value(
+        "", environ_name="APP_URL_COMMANDER", environ_prefix=None
+    )
     CALENDAR_ITIP_ENABLED = values.BooleanValue(
         False, environ_name="CALENDAR_ITIP_ENABLED", environ_prefix=None
     )
