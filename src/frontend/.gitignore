@@ -27,6 +27,11 @@
 /dist
 bundle-stats.html
 
+# Next.js sub-apps (apps/*/)
+apps/**/.next
+apps/**/next-env.d.ts
+apps/**/node_modules
+
 # misc
 .DS_Store
 *.pem
