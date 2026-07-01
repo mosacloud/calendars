@@ -133,6 +133,9 @@ const Panel = ({
   return (
     <div
       className={`app-switcher-panel__dropdown${opensUpward ? " app-switcher-panel__dropdown--up" : ""}`}
+      style={{
+        background: `linear-gradient(180deg, color-mix(in srgb, ${APP_META.calendar.color} 8%, transparent) 0%, transparent 100%) top center / 100% 80px no-repeat, #ffffff`,
+      }}
     >
       <div className="app-switcher-panel__current">
         <AppIcon id="calendar" size={44} />
@@ -222,9 +225,17 @@ export const AppSwitcherButton = () => {
         onClick={handleOpen}
         icon={
           <span className="app-switcher-panel__trigger-grid" aria-hidden>
-            {[...APP_ORDER, APP_ORDER[0]].map((id, i) => (
-              <span key={i} style={{ background: APP_META[id].color }} />
-            ))}
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              {[...APP_ORDER, APP_ORDER[0]].map((id, i) => (
+                <circle
+                  key={i}
+                  cx={3 + (i % 3) * 6}
+                  cy={3 + Math.floor(i / 3) * 6}
+                  r={2}
+                  fill={APP_META[id].color}
+                />
+              ))}
+            </svg>
           </span>
         }
       />
