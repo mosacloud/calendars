@@ -1666,7 +1666,7 @@
       }
 ,
       "app_switcher": {
-        "you_are_in": "VOUS UTILISEZ",
+        "you_are_in": "VOUS ÊTES DANS",
         "jump_to": "ALLER VERS",
         "switch_app": "Changer d'application",
         "apps": {
@@ -1692,7 +1692,7 @@
           },
           "calendar": {
             "label": "Calendar",
-            "subtitle": "Planification"
+            "subtitle": "Planning"
           },
           "chat": {
             "label": "Chat",
@@ -2413,7 +2413,7 @@
       }
 ,
       "app_switcher": {
-        "you_are_in": "JE GEBRUIKT",
+        "you_are_in": "JE BENT IN",
         "jump_to": "GA NAAR",
         "switch_app": "App wisselen",
         "apps": {
