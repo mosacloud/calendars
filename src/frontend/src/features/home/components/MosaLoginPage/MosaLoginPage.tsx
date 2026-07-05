@@ -86,78 +86,121 @@ export const MosaLoginPage = () => {
 
   return (
     <div className="mosa-login">
-        <div className="mosa-login__brand-panel">
-          <div className="mosa-login__brand-bg">
-            <div className="mosa-login__gradient-base" />
-            <div className="mosa-login__grid-overlay" />
-            <div className="mosa-login__orb mosa-login__orb--1" />
-            <div className="mosa-login__orb mosa-login__orb--2" />
-            <div className="mosa-login__orb mosa-login__orb--3" />
-          </div>
+      <div className="mosa-login__brand-panel">
+        <div className="mosa-login__gradient-base" />
+        <div className="mosa-login__grid-overlay" />
 
-          <div className="mosa-login__brand-content">
-            <div className="mosa-login__app-icon">
-              <img src="/mosa.svg" alt="mosa.cloud" />
-            </div>
-            <h1 className="mosa-login__brand-title">mosa.cloud</h1>
-            <p className="mosa-login__brand-tagline">
-              {t('mosa.login.tagline')}
-            </p>
-          </div>
+        <div
+          className="mosa-login__accent-dot"
+          style={{
+            left: '64px',
+            top: 'calc(50% - 160px)',
+            width: '4px',
+            height: '4px',
+            background: 'rgba(255, 255, 255, 0.5)',
+          }}
+        />
+        <div
+          className="mosa-login__accent-dot"
+          style={{
+            left: '256px',
+            top: 'calc(50% - 224px)',
+            width: '12px',
+            height: '12px',
+            background: 'rgba(255, 255, 255, 0.7)',
+          }}
+        />
+        <div
+          className="mosa-login__accent-dot"
+          style={{
+            left: '64px',
+            top: 'calc(50% + 96px)',
+            width: '5px',
+            height: '5px',
+            background: 'rgba(255, 255, 255, 0.55)',
+          }}
+        />
+        <div
+          className="mosa-login__accent-dot"
+          style={{
+            left: '192px',
+            top: 'calc(50% + 224px)',
+            width: '6px',
+            height: '6px',
+            background: 'rgba(255, 255, 255, 0.55)',
+          }}
+        />
+        <div
+          className="mosa-login__accent-dot"
+          style={{
+            left: '384px',
+            top: 'calc(50% + 160px)',
+            width: '4px',
+            height: '4px',
+            background: 'rgba(255, 255, 255, 0.4)',
+          }}
+        />
 
-          <div className="mosa-login__brand-footer">
-            <div className="mosa-login__eu-flag">
-              <EuStars />
-            </div>
-            <span>{t('mosa.login.built_in_eu')}</span>
-          </div>
+        <div className="mosa-login__brand-content">
+          <img src="/logos/mosa-cloud-logo-white.svg" alt="mosa.cloud" />
         </div>
 
-        <div className="mosa-login__form-panel">
-          <div className="mosa-login__lang-wrapper">
-            <LanguageSelector />
+        <div className="mosa-login__brand-footer">
+          <div className="mosa-login__eu-flag">
+            <EuStars />
           </div>
-
-          <div className="mosa-login__mobile-accents" />
-
-          <div className="mosa-login__mobile-header">
-            <div className="mosa-login__mobile-logo" aria-label="mosa.cloud logo" />
-            <span className="mosa-login__mobile-brand">mosa.cloud</span>
-          </div>
-
-          <div className="mosa-login__form-container">
-            <div className="mosa-login__form-header">
-              <h2>
-                {t('mosa.login.welcome_to')}{' '}
-                <span className="mosa-login__product-highlight">Calendar</span>
-              </h2>
-              <p>{t('mosa.login.product_description')}</p>
-            </div>
-
-            <div className="mosa-login__actions">
-              <button
-                className="mosa-login__primary-button"
-                onClick={handleLogin}
-                type="button"
-              >
-                <span>{t('mosa.login.sign_in_button')}</span>
-                <ArrowRight />
-              </button>
-            </div>
-
-            <p className="mosa-login__signup-prompt">
-              {t('mosa.login.no_account')}{' '}
-              <a href="mailto:hi@mosa.cloud">{t('mosa.login.contact_us')}</a>
-            </p>
-          </div>
-
-          <div className="mosa-login__mobile-footer">
-            <div className="mosa-login__mobile-eu-flag">
-              <EuStars />
-            </div>
-            <span>{t('mosa.login.built_in_eu')}</span>
-          </div>
+          <span>{t('mosa.login.built_in_eu')}</span>
         </div>
       </div>
+
+      <div className="mosa-login__form-panel">
+        <div className="mosa-login__lang-wrapper">
+          <LanguageSelector />
+        </div>
+
+        <div className="mosa-login__mobile-accents" />
+
+        <div className="mosa-login__mobile-header">
+          <img src="/logos/mosa-cloud-logo.svg" alt="mosa.cloud" />
+        </div>
+
+        <div className="mosa-login__form-container">
+          <div className="mosa-login__form-header">
+            <p className="mosa-login__eyebrow">
+              {t('mosa.login.product_description')}
+            </p>
+            <h2>
+              {t('mosa.login.welcome_to')}{' '}
+              <span className="mosa-login__product-highlight">Calendar</span>
+            </h2>
+          </div>
+
+          <div className="mosa-login__divider" />
+
+          <div className="mosa-login__actions">
+            <button
+              className="mosa-login__primary-button"
+              onClick={handleLogin}
+              type="button"
+            >
+              <span>{t('mosa.login.sign_in_button')}</span>
+              <ArrowRight />
+            </button>
+          </div>
+
+          <p className="mosa-login__signup-prompt">
+            {t('mosa.login.no_account')}{' '}
+            <a href="mailto:hi@mosa.cloud">{t('mosa.login.contact_us')}</a>
+          </p>
+        </div>
+
+        <div className="mosa-login__mobile-footer">
+          <div className="mosa-login__mobile-eu-flag">
+            <EuStars />
+          </div>
+          <span>{t('mosa.login.built_in_eu')}</span>
+        </div>
+      </div>
+    </div>
   );
 };
