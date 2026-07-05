@@ -13,6 +13,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { fetchAPI } from "@/features/api/fetchApi";
 import { Feedback } from "@/features/feedback/Feedback";
 import { Gaufre } from "@/features/ui/components/gaufre/Gaufre";
+import { AppSwitcherButton } from "@/features/ui/components/app-switcher-panel";
 import { DynamicCalendarLogo } from "@/features/ui/components/logo";
 import { UserProfile } from "@/features/ui/components/user/UserProfile";
 import { FeatureFlag, useFeatureFlag } from "@/hooks/useFeatureFlag";
@@ -109,6 +110,7 @@ export const HeaderRight = () => {
       {!isTablet && (
         <>
           <ApplicationMenu />
+          <AppSwitcherButton />
           <Gaufre />
           <UserProfile />
         </>

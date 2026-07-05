@@ -82,6 +82,7 @@ def test_api_config(is_authenticated):
         "SENTRY_DSN": "https://sentry.test/123",
         "CALENDAR_INVITATION_FROM_EMAIL": None,
         "theme_customization": {},
+        "APP_URLS": {},
     }
 
 

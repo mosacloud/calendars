@@ -186,6 +186,21 @@ class ConfigView(views.APIView):
 
         dict_settings["theme_customization"] = self._load_theme_customization()
 
+        app_urls = {}
+        for app_id, setting_name in [
+            ("epicentre", "APP_URL_EPICENTRE"),
+            ("docs", "APP_URL_DOCS"),
+            ("drive", "APP_URL_DRIVE"),
+            ("meet", "APP_URL_MEET"),
+            ("mail", "APP_URL_MAIL"),
+            ("chat", "APP_URL_CHAT"),
+            ("commander", "APP_URL_COMMANDER"),
+        ]:
+            url = getattr(settings, setting_name, None)
+            if url:
+                app_urls[app_id] = url
+        dict_settings["APP_URLS"] = app_urls
+
         return response.Response(dict_settings)
 
     def _load_theme_customization(self):

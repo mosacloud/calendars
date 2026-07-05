@@ -1,5 +1,6 @@
 export interface ApiConfig {
   FRONTEND_THEME?: string;
+  APP_URLS?: Record<string, string>;
   FRONTEND_LAGAUFRE_ENABLED?: boolean;
   FRONTEND_LAGAUFRE_WIDGET_PATH?: string;
   FRONTEND_LAGAUFRE_WIDGET_API_URL?: string;
