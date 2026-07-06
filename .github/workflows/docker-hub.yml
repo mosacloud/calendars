@@ -60,6 +60,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: src/backend
+          build-contexts: |
+            i18n=src/frontend/src/features/i18n
           target: backend-production
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
@@ -84,7 +86,7 @@ jobs:
         name: Get version from package.json
         id: version
         run: |
-          VERSION=$(jq -r .version src/frontend/apps/calendars/package.json)
+          VERSION=$(jq -r .version src/frontend/package.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
       -
         name: Docker meta
