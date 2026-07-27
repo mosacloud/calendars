@@ -100,7 +100,7 @@ class TranslationService:
         """
         code = getattr(settings, "LANGUAGE_CODE", "en") or "en"
         short = code.split("-")[0].lower()
-        return short if short in ("en", "fr", "nl") else "en"
+        return short if short in ("en", "fr", "de", "nl") else "en"
 
     @classmethod
     def resolve_language(cls, request=None, email: Optional[str] = None) -> str:
@@ -144,7 +144,7 @@ class TranslationService:
         if not lang_code:
             return cls._default_language()
         short = lang_code.split("-")[0].lower()
-        return short if short in ("en", "fr", "nl") else cls._default_language()
+        return short if short in ("en", "fr", "de", "nl") else cls._default_language()
 
     @classmethod
     def format_date(cls, dt: datetime, lang: str) -> str:
@@ -162,6 +162,8 @@ class TranslationService:
         if lang == "nl":
             month = month.lower()
             return f"{weekday} {dt.day} {month} {dt.year}"
+        if lang == "de":
+            return f"{weekday}, {dt.day}. {month} {dt.year}"
 
         # English format
         return f"{weekday}, {month} {dt.day}, {dt.year}"

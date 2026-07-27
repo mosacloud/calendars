@@ -658,8 +658,7 @@
         "noConflicts": "No conflicts",
         "conflicts": "{{count}} conflict(s)",
         "addAttendeesToSeeAvailability": "Add attendees to see availability"
-      }
-,
+      },
       "app_switcher": {
         "you_are_in": "YOU'RE IN",
         "jump_to": "JUMP TO",
@@ -871,259 +870,6 @@
         "reader": "Lecteur",
         "freebusy": "Disponibilités seulement",
         "owner": "Propriétaire"
-      },
-      "time": {
-        "breadcrumbs": {
-          "spaces": "Espaces"
-        },
-        "modal": {
-          "move": {
-            "title": "Déplacer",
-            "move_button": "Déplacer ici",
-            "description_one_item": "Choisissez le nouvel emplacement pour <strong>{{name}}</strong>",
-            "description_multiple_items": "Choisissez le nouvel emplacement pour les <strong>{{count}}</strong> éléments sélectionnés"
-          }
-        },
-        "rightPanel": {
-          "suspicious": {
-            "text": "Ce fichier semble suspect. Il n'est visible que pour vous."
-          },
-          "file_too_large_to_analyze": {
-            "text": "Ce fichier est trop volumineux pour être analysé. Il peut être dangereux de le télécharger."
-          },
-          "multipleSelection": {
-            "text": "Plusieurs fichiers sélectionnés",
-            "alt": "Image de plusieurs fichiers sélectionnés"
-          },
-          "empty": {
-            "text": "Aucun fichier sélectionné",
-            "alt": "Image d'un fichier sélectionné"
-          },
-          "sharing": "Partage",
-          "share": "Partager",
-          "format": "Format",
-          "updated_at": "Modification",
-          "created_at": "Création",
-          "size": "Poids",
-          "created_by": "Créé par",
-          "description": "Description"
-        },
-        "grid": {
-          "name": "Nom",
-          "last_update": "Dernière modification",
-          "empty": {
-            "default": "Aucun dossier trouvé dans le dossier sélectionné",
-            "caption": "Déposez vos fichiers ici",
-            "caption_no_create": "Vous n'avez pas les droits pour ajouter des fichiers",
-            "cta": "Ou cliquez sur \"Créer\"",
-            "cta_no_create": "Les lecteurs ne peuvent pas ajouter de fichiers ou créer de dossiers"
-          },
-          "no_url": "Cette ressource n'a pas d'URL",
-          "actions": {
-            "button_aria_label": "Plus d'actions pour {{name}}",
-            "info": "Informations",
-            "share": "Partager",
-            "download": "Télécharger",
-            "rename": "Renommer",
-            "move": "Déplacer",
-            "duplicate": "Dupliquer",
-            "delete": "Supprimer",
-            "restore": "Restaurer",
-            "hard_delete": "Supprimer définitivement"
-          }
-        },
-        "filters": {
-          "scopes": {
-            "label": "Emplacement",
-            "options": {
-              "all": "Calendars",
-              "trash": "Corbeille"
-            }
-          },
-          "type": {
-            "label": "Type",
-            "options": {
-              "all": "Tous",
-              "file": "Fichier",
-              "folder": "Dossier",
-              "reset": "Réinitialiser"
-            }
-          },
-          "workspace": {
-            "label": "Espace"
-          }
-        },
-        "tree": {
-          "trash": "Corbeille",
-          "createFolder": "Créer",
-          "personalSpace": "Espace personnel",
-          "shared_space": "Espace partagé",
-          "public_space": "Espace public",
-          "search": "Rechercher",
-          "import": {
-            "label": "Importer",
-            "files": "Importer des fichiers",
-            "folders": "Importer des dossiers"
-          },
-          "create": {
-            "label": "Créer",
-            "folder": "Nouveau dossier",
-            "workspace": "Nouvel espace"
-          },
-          "workspace": {
-            "options": {
-              "info": "Informations",
-              "settings_workspace": "Paramètre de l'espace",
-              "settings_folder": "Paramètres du dossier",
-              "delete_workspace": "Supprimer l'espace",
-              "delete_folder": "Supprimer le dossier",
-              "share": "Partager",
-              "share_view": "Voir les accès"
-            },
-            "move": {
-              "confirmation_modal": {
-                "title": "Transfert de droits",
-                "description": "Vous êtes sur le point de déplacer l'élément <strong>{{sourceItem}}</strong> vers le dossier <strong>{{targetItem}}</strong>, votre document héritera du partage du dossier cible.",
-                "description_multiple": "Vous êtes sur le point de déplacer <strong>{{count}}</strong> éléments vers le dossier <strong>{{targetItem}}</strong>, vos documents hériteront du partage du dossier cible.",
-                "confirm_button": "Déplacer quand même",
-                "cancel_button": "Annuler"
-              }
-            }
-          }
-        },
-        "trash": {
-          "title": "Corbeille",
-          "description": "Suppression automatique après 30 jours",
-          "navigate": {
-            "modal": {
-              "title": "Ce dossier est dans la corbeille",
-              "description": "Pour afficher ce dossier, vous devez d'abord le restaurer."
-            }
-          },
-          "hard_delete": {
-            "title": "Supprimer définitivement",
-            "content_one": "Êtes-vous sûr de vouloir supprimer cet élément définitivement?",
-            "content_other": "Êtes-vous sûr de vouloir supprimer ces {{count}} éléments définitivement?",
-            "cancel": "Annuler",
-            "confirm": "Supprimer définitivement"
-          }
-        },
-        "search": {
-          "modal": {
-            "title": "Rechercher",
-            "description": "La fonction de recherche est en cours de développement et sera bientôt disponible.",
-            "placeholder": "Taper un mot clé ou le nom d'un fichier",
-            "results": "Sélectionnez un document",
-            "filters": {
-              "reset": "Réinitialiser"
-            }
-          }
-        },
-        "selectionBar": {
-          "caption_one": "1 élément sélectionné",
-          "caption_other": "{{count}} éléments sélectionnés",
-          "download": "Télécharger",
-          "move": "Déplacer",
-          "delete": "Supprimer",
-          "reset_selection": "Réinitialiser la sélection"
-        },
-        "folders": {
-          "edit": {
-            "title": "Modifier le dossier",
-            "description": "Modifier les informations du dossier",
-            "cancel": "Annuler",
-            "submit": "Mettre à jour"
-          },
-          "form": {
-            "title": "Nom du dossier",
-            "description": "Description",
-            "cancel": "Annuler",
-            "submit": "Mettre à jour"
-          }
-        },
-        "files": {
-          "not_found": {
-            "description": "Le fichier que vous recherchez n'existe pas."
-          }
-        },
-        "workspaces": {
-          "mainWorkspace": "Mon espace",
-          "form": {
-            "title": "Nom de l'espace",
-            "description": "Description",
-            "settings": "Paramètres de l'espace"
-          },
-          "create": {
-            "title": "Nouvel espace",
-            "description": "Un espace vous permet d'organiser vos fichiers en équipe.",
-            "cancel": "Annuler",
-            "submit": "Créer l'espace"
-          },
-          "edit": {
-            "title": "Modifier l'espace",
-            "description": "Modifier les informations de l'espace",
-            "cancel": "Annuler",
-            "submit": "Mettre à jour"
-          }
-        },
-        "actions": {
-          "createFolder": {
-            "modal": {
-              "title": "Créer un dossier",
-              "label": "Nom du dossier",
-              "placeholder": "Entrez le nom du dossier",
-              "cancel": "Annuler",
-              "submit": "Créer"
-            }
-          },
-          "upload": {
-            "toast": "Déposez vos fichiers ici pour les transférer dans {{title}}",
-            "toast_no_rights": "Vous n'avez pas les droits nécessaires pour transférer des fichiers dans {{title}}",
-            "steps": {
-              "preparing": "Préparation du transfert...",
-              "create_folders": "Création des dossiers en cours..."
-            },
-            "files": {
-              "description_one": "{{count}} fichier en cours de transfert",
-              "description_other": "{{count}} fichiers en cours de transfert",
-              "description_done_one": "{{count}} fichier transféré",
-              "description_done_other": "{{count}} fichiers transférés"
-            }
-          },
-          "delete": {
-            "toast_one": "Élément supprimé",
-            "toast_other": "{{count}} éléments supprimés",
-            "low_rights_toast": "Vous ne pouvez pas restaurer ces éléments car vous n'avez pas les droits nécessaires.",
-            "toast_error_one": "Une erreur est survenue lors de la suppression de l'élément.",
-            "toast_error_other": "Une erreur est survenue lors de la suppression des éléments."
-          },
-          "hard_delete": {
-            "toast_one": "Élément supprimé définitivement",
-            "toast_other": "{{count}} éléments supprimés définitivement"
-          },
-          "restore": {
-            "toast_one": "Élément restauré",
-            "toast_other": "{{count}} éléments restaurés"
-          },
-          "move": {
-            "toast_one": "{{count}} élément déplacé",
-            "toast_other": "{{count}} éléments déplacés"
-          },
-          "share": {
-            "modal": {
-              "title": "Partager l'espace"
-            }
-          },
-          "rename": {
-            "modal": {
-              "title": "Renommer",
-              "label": "Nouveau nom",
-              "placeholder": "Entrez le nouveau nom",
-              "cancel": "Annuler",
-              "submit": "Renommer"
-            }
-          }
-        }
       },
       "time": {
         "years_ago_one": "il y a {{count}} an",
@@ -1663,8 +1409,7 @@
         "noConflicts": "Aucun conflit",
         "conflicts": "{{count}} conflit(s)",
         "addAttendeesToSeeAvailability": "Ajoutez des participants pour voir les disponibilités"
-      }
-,
+      },
       "app_switcher": {
         "you_are_in": "VOUS ÊTES DANS",
         "jump_to": "ALLER VERS",
@@ -1701,6 +1446,708 @@
           "commander": {
             "label": "Commander",
             "subtitle": "Admin"
+          }
+        }
+      }
+    }
+  },
+  "de": {
+    "translation": {
+      "401": {
+        "title": "Sie müssen angemeldet sein, um auf diese Anwendung zuzugreifen.",
+        "button": "Anmelden"
+      },
+      "403": {
+        "title": "Sie haben nicht die erforderlichen Berechtigungen, um auf diese Seite zuzugreifen.",
+        "button": "Startseite"
+      },
+      "no_access": {
+        "title": "Ihre Anmeldung war erfolgreich, aber diese Anwendung ist für Ihr Konto nicht verfügbar.",
+        "description": "Wenn Sie glauben, dass dies ein Fehler ist, wenden Sie sich bitte an den Support.",
+        "button": "Abmelden"
+      },
+      "common": {
+        "back": "Zurück",
+        "cancel": "Abbrechen",
+        "close": "Schließen",
+        "comingSoon": "Demnächst verfügbar",
+        "save": "Speichern"
+      },
+      "clipboard": {
+        "success": "In die Zwischenablage kopiert",
+        "error": "Kopieren in die Zwischenablage fehlgeschlagen"
+      },
+      "app_title": "Calendar",
+      "app_description": "Kalenderanwendung",
+      "welcome": "Willkommen",
+      "logout": "Abmelden",
+      "login": "Anmelden",
+      "my_account": "Mein Konto",
+      "settings": {
+        "label": "Einstellungen",
+        "workingHours": {
+          "title": "Arbeitszeiten",
+          "description": "Legen Sie Ihre verfügbaren Zeiten für die Planung fest",
+          "when": "Wann",
+          "everyMonday": "Jeden Montag",
+          "everyTuesday": "Jeden Dienstag",
+          "everyWednesday": "Jeden Mittwoch",
+          "everyThursday": "Jeden Donnerstag",
+          "everyFriday": "Jeden Freitag",
+          "everySaturday": "Jeden Samstag",
+          "everySunday": "Jeden Sonntag",
+          "specificDate": "Bestimmtes Datum...",
+          "start": "Beginn",
+          "end": "Ende",
+          "addAvailability": "Verfügbarkeit hinzufügen",
+          "removeAvailability": "Entfernen",
+          "save": "Speichern",
+          "saved": "Arbeitszeiten gespeichert",
+          "invalidRange": "Die Endzeit muss nach der Startzeit liegen"
+        }
+      },
+      "api": {
+        "error": {
+          "unexpected": "Ein unerwarteter Fehler ist aufgetreten."
+        }
+      },
+      "home": {
+        "title": "Organisieren Sie Ihre Zeit, gemeinsam",
+        "subtitle": "Eine moderne Open-Source-Kalenderanwendung. Erstellen Sie Termine, laden Sie Teilnehmer ein, teilen Sie Kalender mit Ihrem Team und synchronisieren Sie auf allen Ihren Geräten.",
+        "main_button": "Anmelden",
+        "more": "Mehr erfahren"
+      },
+      "mosa": {
+        "login": {
+          "page_title": "Anmelden bei Calendar - mosa.cloud",
+          "tagline": "Zusammenarbeiten ohne Kompromisse",
+          "welcome_to": "Willkommen bei",
+          "product_description": "Gemeinsam planen, immer synchron",
+          "sign_in_button": "Mit Ihrem Konto anmelden",
+          "no_account": "Noch kein Konto?",
+          "contact_us": "Kontaktieren Sie uns",
+          "built_in_eu": "In der EU entwickelt"
+        }
+      },
+      "feedback": {
+        "button": "Feedback geben",
+        "modal": {
+          "title": "Neues Feedback",
+          "description": "Calendars befindet sich in der Entwicklung: Ihr Feedback zählt! Wählen Sie aus, wie Sie Ihre Ideen mitteilen möchten:",
+          "buttons": {
+            "form": {
+              "title": "Schnelles Feedback geben",
+              "description": "30 Sekunden, um uns Ihre Meinung mitzuteilen oder einen Fehler zu melden"
+            },
+            "tchap": {
+              "title": "Auf Tchap schreiben",
+              "description": "Direkter Austausch mit unserem Team"
+            },
+            "visio": {
+              "title": "Per Video sprechen",
+              "description": "20 Minuten für ein ausführliches Gespräch"
+            }
+          }
+        }
+      },
+      "feedback_widget": {
+        "shortTitle": "Feedback?",
+        "title": "Haben Sie Feedback für uns?",
+        "placeholder": "Teilen Sie hier Ihr Feedback mit...",
+        "email_placeholder": "Ihre E-Mail-Adresse...",
+        "submit_text": "Feedback senden",
+        "success_text": "Vielen Dank für Ihr Feedback!",
+        "success_text2": "Bei Fragen melden wir uns in Kürze bei Ihnen."
+      },
+      "authentication": {
+        "error": {
+          "alpha": "Diese Anwendung befindet sich in der Alpha-Phase und der Zugriff ist eingeschränkt.",
+          "user_cannot_access_app": "Sie haben nicht die erforderlichen Berechtigungen, um auf diese Anwendung zuzugreifen. Wenden Sie sich an Ihren Administrator."
+        }
+      },
+      "roles": {
+        "administrator": "Administrator",
+        "editor": "Bearbeiter",
+        "reader": "Leser",
+        "freebusy": "Nur Verfügbarkeit",
+        "owner": "Eigentümer"
+      },
+      "time": {
+        "years_ago_one": "vor {{count}} Jahr",
+        "years_ago_other": "vor {{count}} Jahren",
+        "months_ago_one": "vor {{count}} Monat",
+        "months_ago_other": "vor {{count}} Monaten",
+        "weeks_ago_one": "vor {{count}} Woche",
+        "weeks_ago_other": "vor {{count}} Wochen",
+        "days_ago_one": "vor {{count}} Tag",
+        "days_ago_other": "vor {{count}} Tagen",
+        "hours_ago_one": "vor {{count}} Stunde",
+        "hours_ago_other": "vor {{count}} Stunden",
+        "minutes_ago_one": "vor {{count}} Minute",
+        "minutes_ago_other": "vor {{count}} Minuten",
+        "seconds_ago": "vor wenigen Sekunden"
+      },
+      "calendar": {
+        "error": {
+          "connection": "Verbindung zum Kalenderserver fehlgeschlagen. Bitte versuchen Sie es später erneut.",
+          "fetchCalendars": "Kalender konnten nicht geladen werden. Bitte versuchen Sie es später erneut."
+        },
+        "views": {
+          "day": "Tag",
+          "workWeek": "Arbeitswoche",
+          "week": "Woche",
+          "month": "Monat",
+          "listDay": "Tagesliste",
+          "listWeek": "Wochenliste",
+          "listMonth": "Monatsliste",
+          "listYear": "Jahresliste",
+          "today": "Heute",
+          "mobile": {
+            "oneDay": "Ein Tag",
+            "workWeek": "Arbeitswoche",
+            "week": "Woche",
+            "list": "Liste",
+            "noEvents": "Keine Termine"
+          }
+        },
+        "navigation": {
+          "previous": "Zurück",
+          "next": "Weiter"
+        },
+        "event": {
+          "createTitle": "Termin erstellen",
+          "editTitle": "Termin bearbeiten",
+          "calendar": "Kalender",
+          "title": "Titel",
+          "titlePlaceholder": "Terminbezeichnung",
+          "location": "Ort",
+          "locationPlaceholder": "Ort",
+          "openLocation": "Öffnen",
+          "description": "Beschreibung",
+          "descriptionPlaceholder": "Beschreibung",
+          "start": "Beginn",
+          "end": "Ende",
+          "endBeforeStart": "Die Endzeit muss nach der Startzeit liegen",
+          "allDay": "Ganztägig",
+          "organizer": "Organisator",
+          "attendees": "Teilnehmer",
+          "deleteConfirm": "Termin löschen",
+          "deleteConfirmMessage": "Möchten Sie diesen Termin wirklich löschen?",
+          "deleteRecurringPrompt": "Dies ist ein wiederkehrender Termin. Was möchten Sie löschen?",
+          "deleteThisOccurrence": "Nur diesen Termin",
+          "deleteThisAndFuture": "Diesen und alle folgenden Termine",
+          "deleteAllOccurrences": "Alle Termine",
+          "editRecurringTitle": "Wiederkehrenden Termin bearbeiten",
+          "editRecurringPrompt": "Dies ist ein wiederkehrender Termin. Was möchten Sie bearbeiten?",
+          "editThisOccurrence": "Nur diesen Termin",
+          "editThisAndFuture": "Diesen und alle folgenden Termine",
+          "editAllOccurrences": "Alle Termine",
+          "enterChoice": "Geben Sie Ihre Wahl ein (1, 2 oder 3):",
+          "invalidChoice": "Ungültige Auswahl. Bitte geben Sie 1, 2 oder 3 ein.",
+          "delete": "Löschen",
+          "cancel": "Abbrechen",
+          "save": "Speichern",
+          "create": "Erstellen",
+          "sections": {
+            "addRecurrence": "Wiederholung hinzufügen",
+            "addLocation": "Ort hinzufügen",
+            "addVideoConference": "Meet",
+            "createVisio": "Videokonferenz hinzufügen",
+            "removeVisio": "Videokonferenz entfernen",
+            "videoLink": "Videokonferenz-Link",
+            "addAttendees": "Teilnehmer hinzufügen",
+            "addResources": "Ressourcen hinzufügen",
+            "addDescription": "Beschreibung hinzufügen",
+            "addReminder": "Erinnerung hinzufügen",
+            "addAttachment": "Anhang hinzufügen",
+            "moreOptions": "Weitere Optionen",
+            "reminder_one": "Erinnerung",
+            "reminder_other": "Erinnerungen",
+            "attachment_one": "Anhang",
+            "attachment_other": "Anhänge"
+          },
+          "reminders": {
+            "5min": "5 Minuten vorher",
+            "15min": "15 Minuten vorher",
+            "30min": "30 Minuten vorher",
+            "1hour": "1 Stunde vorher",
+            "1day": "1 Tag vorher",
+            "1week": "1 Woche vorher"
+          },
+          "status": {
+            "label": "Status",
+            "confirmed": "Bestätigt",
+            "tentative": "Vorläufig",
+            "cancelled": "Abgesagt"
+          },
+          "visibility": {
+            "label": "Sichtbarkeit",
+            "public": "Öffentlich",
+            "publicHelp": "Alle Personen, mit denen der Kalender geteilt wird, sehen alle Details.",
+            "private": "Privat",
+            "privateHelp": "Verborgen vor Personen mit reinem Leserecht. Personen, die den Kalender bearbeiten können, sowie zum Termin eingeladene Personen, sehen ihn trotzdem.",
+            "confidential": "Vertraulich",
+            "confidentialHelp": "Personen mit reinem Leserecht sehen nur einen belegten Zeitraum, ohne Details. Personen, die den Kalender bearbeiten können, sowie eingeladene Personen, sehen alles."
+          },
+          "availability": {
+            "label": "Verfügbarkeit",
+            "busy": "Beschäftigt",
+            "free": "Frei"
+          },
+          "send": "Senden",
+          "invitation": "Einladung",
+          "organizedBy": "Organisiert von",
+          "accept": "Annehmen",
+          "maybe": "Vielleicht",
+          "decline": "Ablehnen",
+          "accepted": "Angenommen",
+          "tentative": "Vielleicht",
+          "declined": "Abgelehnt",
+          "needsAction": "Keine Antwort",
+          "yourResponse": "Ihre Antwort",
+          "cancelledNotice": "Dieser Termin wurde abgesagt.",
+          "rsvpRecurringTitle": "Auf wiederkehrenden Termin antworten",
+          "rsvpRecurringPrompt": "Dies ist ein wiederkehrender Termin. Worauf soll Ihre Antwort angewendet werden?"
+        },
+        "list": {
+          "defaultCalendarName": "Mein Kalender",
+          "myCalendars": "Meine Kalender",
+          "sharedCalendars": "Geteilte Kalender",
+          "shared": "(geteilt)",
+          "mailboxCalendar": "Verknüpft mit Postfach: {{email}}",
+          "unnamed": "Unbenannter Kalender",
+          "showCalendar": "Kalender anzeigen",
+          "edit": "Bearbeiten",
+          "delete": "Löschen",
+          "share": "Teilen",
+          "import": "Termine importieren",
+          "subscription": "Abonnement-URL",
+          "moveUp": "Nach oben verschieben",
+          "moveDown": "Nach unten verschieben",
+          "options": "Optionen"
+        },
+        "importEvents": {
+          "title": "Termine importieren",
+          "description": "Termine aus einer ICS-Datei in \"{{name}}\" importieren.",
+          "selectFile": "Datei auswählen",
+          "import": "Importieren",
+          "resultHeader": "Importergebnisse",
+          "imported": "Termine importiert",
+          "duplicates": "Termine waren bereits vorhanden",
+          "skipped": "Termine übersprungen (nicht unterstütztes Format)",
+          "error": "Beim Importieren ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+          "errorDetails": "Fehlerdetails"
+        },
+        "subscription": {
+          "title": "Kalender-Abonnement-URL",
+          "description": "Verwenden Sie diese URL, um \"{{name}}\" von externen Kalenderanwendungen (Apple Calendar, Google Calendar, Outlook usw.) zu abonnieren.",
+          "loading": "Abonnement-URL wird generiert...",
+          "copy": "Kopieren",
+          "copied": "Kopiert!",
+          "close": "Schließen",
+          "warning": "Diese URL enthält ein privates Token. Jeder mit diesem Link kann Ihre Kalendertermine einsehen.",
+          "regenerate": "URL neu generieren",
+          "regenerateConfirm": {
+            "title": "Abonnement-URL neu generieren?",
+            "message": "Dadurch wird die aktuelle URL ungültig. Externe Kalender, die die alte URL verwenden, werden nicht mehr synchronisiert.",
+            "confirm": "Neu generieren"
+          },
+          "error": "Abonnement-URL konnte nicht generiert werden. Bitte versuchen Sie es erneut.",
+          "errorPermission": "Sie haben keine Berechtigung, auf diesen Kalender zuzugreifen.",
+          "errorNetwork": "Netzwerkfehler. Bitte überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+          "errorServer": "Serverfehler. Bitte versuchen Sie es später erneut."
+        },
+        "leftPanel": {
+          "newEvent": "Neuer Termin"
+        },
+        "miniCalendar": {
+          "previousMonth": "Vorheriger Monat",
+          "nextMonth": "Nächster Monat",
+          "weekAbbrev": "KW"
+        },
+        "recurrence": {
+          "label": "Wiederholen",
+          "none": "Wiederholt sich nicht",
+          "daily": "Täglich",
+          "weekly": "Wöchentlich",
+          "monthly": "Monatlich",
+          "yearly": "Jährlich",
+          "custom": "Benutzerdefiniert...",
+          "everyLabel": "Alle",
+          "days": "Tage",
+          "weeks": "Wochen",
+          "months": "Monate",
+          "years": "Jahre",
+          "repeatOn": "Wiederholen am",
+          "repeatOnDay": "Wiederholen am Tag",
+          "repeatOnDate": "Wiederholen am Datum",
+          "dayOfMonth": "Tag",
+          "endsLabel": "Endet",
+          "never": "Nie",
+          "on": "Am",
+          "after": "Nach",
+          "occurrences": "Wiederholungen",
+          "weekdays": {
+            "mo": "Mo",
+            "tu": "Di",
+            "we": "Mi",
+            "th": "Do",
+            "fr": "Fr",
+            "sa": "Sa",
+            "su": "So"
+          },
+          "monthNames": {
+            "january": "Januar",
+            "february": "Februar",
+            "march": "März",
+            "april": "April",
+            "may": "Mai",
+            "june": "Juni",
+            "july": "Juli",
+            "august": "August",
+            "september": "September",
+            "october": "Oktober",
+            "november": "November",
+            "december": "Dezember"
+          },
+          "warnings": {
+            "februaryMax": "Der Februar hat höchstens 29 Tage",
+            "leapYear": "Dieses Datum (29. Februar) existiert nur in Schaltjahren",
+            "monthMax30": "Dieser Monat hat höchstens 30 Tage",
+            "dayMax31": "Der Tag muss zwischen 1 und 31 liegen"
+          },
+          "advancedPropertiesWarning": "Dieses Wiederholungsmuster verwendet erweiterte Eigenschaften, die hier nicht vollständig bearbeitet werden können. Beim Speichern kann sich das Muster vereinfachen."
+        },
+        "createCalendar": {
+          "title": "Kalender erstellen",
+          "name": "Name",
+          "namePlaceholder": "Kalendername",
+          "nameRequired": "Name ist erforderlich",
+          "color": "Farbe",
+          "description": "Beschreibung",
+          "descriptionPlaceholder": "Kalenderbeschreibung (optional)",
+          "cancel": "Abbrechen",
+          "create": "Erstellen",
+          "defaultName": "Mein Kalender",
+          "mailbox": "Absenderidentität",
+          "noMailbox": "Keine (eigenständiger Kalender)",
+          "noMailboxHint": "Einladungen werden von der System-E-Mail-Adresse gesendet, nicht von einer persönlichen E-Mail-Adresse.",
+          "mailboxHint": "Einladungen werden von {{email}} gesendet und der Kalender wird mit allen Postfachnutzern geteilt.",
+          "noMailboxAvailable": "Einladungen werden von der System-E-Mail-Adresse gesendet."
+        },
+        "onboarding": {
+          "title": "Willkommen! Erstellen Sie Ihren ersten Kalender",
+          "description": "Wählen Sie eine Absenderidentität für Ihren Kalender. Diese bestimmt, welche E-Mail-Adresse beim Versenden von Termineinladungen verwendet wird.",
+          "noMailboxesMessage": "Sie haben keinen Zugriff auf Postfächer in Messages, daher werden alle Einladungen von der System-Adresse gesendet."
+        },
+        "editCalendar": {
+          "title": "Kalender bearbeiten",
+          "save": "Speichern",
+          "linkedMailbox": "Verknüpft mit Postfach {{email}}",
+          "includeInAvailability": "In Verfügbarkeit einbeziehen"
+        },
+        "deleteCalendar": {
+          "title": "Kalender löschen",
+          "message": "Möchten Sie den Kalender \"{{name}}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+          "confirm": "Löschen"
+        },
+        "shareCalendar": {
+          "title": "Kalender teilen",
+          "emailPlaceholder": "E-Mail-Adresse eingeben",
+          "share": "Teilen",
+          "hint": "Die Person erhält dieselben Rechte wie Sie (Lesen und Schreiben).",
+          "success": "Kalender geteilt mit {{email}}",
+          "error": "Kalender konnte nicht geteilt werden",
+          "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
+          "syncManagedHint": "Verwaltet durch Messages.",
+          "mailboxInfoAdmin": "Dieser Kalender ist mit dem Postfach {{email}} verknüpft. Sie können unten Freigaben mit Leserecht hinzufügen. Der Schreibzugriff wird in Messages verwaltet.",
+          "mailboxInfoReadonly": "Dieser Kalender ist mit dem Postfach {{email}} verknüpft. Die Freigabe wird in Messages verwaltet."
+        },
+        "attendees": {
+          "label": "Teilnehmer einladen",
+          "placeholder": "Per E-Mail-Adresse einladen",
+          "add": "Hinzufügen",
+          "remove": "Teilnehmer entfernen",
+          "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
+          "alreadyAdded": "Diese E-Mail-Adresse ist bereits in der Liste",
+          "cannotAddOrganizer": "Sie können sich nicht selbst als Teilnehmer hinzufügen",
+          "participants": "Teilnehmer",
+          "organizer": "Organisator",
+          "viewProfile": "Profil anzeigen",
+          "cannotRemoveOrganizer": "Organisator kann nicht entfernt werden",
+          "noResults": "Keine Benutzer gefunden",
+          "sentFrom": "Die Einladung wird von {{email}} gesendet"
+        },
+        "resources": {
+          "placeholder": "Ressource auswählen...",
+          "remove": "Ressource entfernen"
+        },
+        "weekdaysFull": {
+          "monday": "Montag",
+          "tuesday": "Dienstag",
+          "wednesday": "Mittwoch",
+          "thursday": "Donnerstag",
+          "friday": "Freitag",
+          "saturday": "Samstag",
+          "sunday": "Sonntag"
+        }
+      },
+      "email": {
+        "subject": {
+          "invitation": "Einladung: {{summary}}",
+          "update": "Aktualisierte Einladung: {{summary}}",
+          "cancel": "Abgesagt: {{summary}}",
+          "reply": "Antwort: {{summary}}"
+        },
+        "noTitle": "(Kein Titel)",
+        "allDay": "Ganztägig",
+        "invitation": {
+          "title": "Termineinladung",
+          "heading": "Termineinladung",
+          "badge": "Termineinladung",
+          "body": "{{organizer}} lädt Sie zu einem Termin ein"
+        },
+        "update": {
+          "title": "Termin aktualisiert",
+          "heading": "Termin aktualisiert",
+          "badge": "EINLADUNG AKTUALISIERT",
+          "body": "{{organizer}} hat einen Termin aktualisiert, zu dem Sie eingeladen sind"
+        },
+        "cancel": {
+          "title": "Termin abgesagt",
+          "heading": "Termin abgesagt",
+          "badge": "EINLADUNG ABGESAGT",
+          "body": "{{organizer}} hat diesen Termin abgesagt"
+        },
+        "reply": {
+          "title": "Antwort auf Termin",
+          "heading": "Antwort erhalten",
+          "badge": "Antwort",
+          "body": "{{attendee}} hat auf Ihren Termin geantwortet"
+        },
+        "labels": {
+          "when": "Wann",
+          "until": "bis",
+          "location": "Ort",
+          "videoConference": "Videokonferenz",
+          "organizer": "Organisator",
+          "attendee": "Teilnehmer",
+          "description": "Beschreibung",
+          "wasScheduledFor": "War geplant für"
+        },
+        "actions": {
+          "accept": "Annehmen",
+          "maybe": "Vielleicht",
+          "decline": "Ablehnen"
+        },
+        "instructions": {
+          "invitation": "Sie können auch die angehängte .ics-Datei mit Ihrer Kalenderanwendung öffnen.",
+          "update": "Dieser Termin wurde aktualisiert. Sie können auch die angehängte .ics-Datei öffnen, um Ihren Kalender zu aktualisieren.",
+          "cancel": "Dieser Termin wurde abgesagt. Öffnen Sie die angehängte .ics-Datei, um ihn aus Ihrem Kalender zu entfernen.",
+          "reply": "Die Antwort des Teilnehmers wurde erfasst. Öffnen Sie die angehängte .ics-Datei, um Ihren Kalender zu aktualisieren."
+        },
+        "footer": {
+          "invitation": "Diese Einladung wurde über {{appName}} gesendet",
+          "notification": "Diese Benachrichtigung wurde über {{appName}} gesendet"
+        },
+        "replyTo": {
+          "body": "{{attendee}} hat auf Ihren Termin geantwortet: {{summary}}",
+          "details": "Termindetails",
+          "instruction": "Die Antwort des Teilnehmers wurde in der angehängten .ics-Datei erfasst."
+        },
+        "cancelDetails": {
+          "body": "{{organizer}} hat den Termin abgesagt: {{summary}}",
+          "details": "Details des abgesagten Termins",
+          "instruction": "Dieser Termin wurde abgesagt. Sie können ihn aus Ihrem Kalender entfernen, indem Sie die angehängte .ics-Datei öffnen."
+        },
+        "updateDetails": {
+          "body": "{{organizer}} hat den Termin aktualisiert",
+          "details": "Details des aktualisierten Termins"
+        },
+        "invitationDetails": {
+          "body": "{{organizer}} lädt Sie zu einem Termin ein",
+          "details": "Termindetails",
+          "respond": "Antworten Sie auf diese Einladung:"
+        }
+      },
+      "rsvp": {
+        "accepted": "Sie haben die Einladung angenommen",
+        "tentative": "Sie haben mit \"Vielleicht\" auf die Einladung geantwortet",
+        "declined": "Sie haben die Einladung abgelehnt",
+        "processing": "Ihre Antwort wird gesendet…",
+        "responseSent": "Ihre Antwort wurde an den Organisator gesendet.",
+        "failed": "Ihre Antwort konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
+        "error": {
+          "title": "Fehler",
+          "invalidLink": "Ungültiger Link",
+          "invalidAction": "Ungültige Aktion.",
+          "invalidToken": "Dieser Link ist ungültig oder abgelaufen.",
+          "invalidPayload": "Dieser Link ist ungültig.",
+          "eventNotFound": "Der Termin wurde nicht gefunden. Er wurde möglicherweise gelöscht.",
+          "eventPast": "Dieser Termin liegt bereits in der Vergangenheit.",
+          "notAttendee": "Sie sind nicht als Teilnehmer dieses Termins eingetragen.",
+          "updateFailed": "Beim Aktualisieren ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+          "tokenExpired": "Dieser Link ist abgelaufen. Bitte bitten Sie den Organisator um eine neue Einladung.",
+          "rateLimited": "Zu viele Anfragen. Bitte warten Sie einen Moment und versuchen Sie es erneut."
+        }
+      },
+      "resources": {
+        "title": "Ressourcen",
+        "description": "Verwalten Sie Besprechungsräume und gemeinsame Ressourcen.",
+        "search": "Ressourcen suchen...",
+        "loading": "Ressourcen werden geladen...",
+        "empty": "Es wurden noch keine Ressourcen erstellt.",
+        "noResults": "Keine Ressourcen entsprechen Ihrer Suche.",
+        "types": {
+          "room": "Raum",
+          "resource": "Ressource"
+        },
+        "filters": {
+          "all": "Alle"
+        },
+        "create": {
+          "button": "Ressource hinzufügen",
+          "title": "Ressource erstellen",
+          "nameLabel": "Name",
+          "typeLabel": "Typ",
+          "submit": "Erstellen",
+          "success": "Ressource erfolgreich erstellt.",
+          "error": "Ressource konnte nicht erstellt werden."
+        },
+        "delete": {
+          "button": "Löschen",
+          "title": "Ressource löschen",
+          "message": "Möchten Sie \"{{name}}\" wirklich löschen? Dies kann nicht rückgängig gemacht werden.",
+          "confirm": "Löschen",
+          "success": "Ressource erfolgreich gelöscht.",
+          "error": "Ressource konnte nicht gelöscht werden."
+        }
+      },
+      "integrations": {
+        "title": "Integrationen",
+        "description": "Verwalten Sie Integrationskanäle für externe Dienste, um auf Ihre Kalender zuzugreifen.",
+        "loading": "Integrationen werden geladen...",
+        "empty": "Es wurden noch keine Integrationen erstellt.",
+        "scopes": {
+          "calendars_read": "Kalender lesen",
+          "calendars_write": "Kalender schreiben",
+          "events_read": "Termine lesen",
+          "events_write": "Termine schreiben",
+          "edit": "Berechtigungen bearbeiten",
+          "updateSuccess": "Berechtigungen erfolgreich aktualisiert.",
+          "updateError": "Berechtigungen konnten nicht aktualisiert werden."
+        },
+        "lastUsed": "Zuletzt verwendet: {{date}}",
+        "create": {
+          "button": "Integration hinzufügen",
+          "title": "Integration erstellen",
+          "chooseType": "Wählen Sie die Art der Integration, die Sie erstellen möchten.",
+          "nameLabel": "Name",
+          "submit": "Erstellen",
+          "success": "Integration erfolgreich erstellt.",
+          "error": "Integration konnte nicht erstellt werden.",
+          "tokenTitle": "Integrationstoken",
+          "tokenWarning": "Kopieren Sie dieses Token jetzt. Es wird nicht erneut angezeigt."
+        },
+        "types": {
+          "caldav": {
+            "title": "CalDAV-Zugangsdaten",
+            "description": "Generieren Sie einen Benutzernamen und ein Passwort, um externe Kalender-Clients (Thunderbird, Apple Calendar usw.) über CalDAV zu verbinden."
+          },
+          "ical-feed": {
+            "title": "iCal-Abonnement"
+          },
+          "webhook": {
+            "title": "Webhook",
+            "description": "Terminänderungen an einen externen Endpunkt über HTTP senden."
+          }
+        },
+        "delete": {
+          "button": "Löschen",
+          "title": "Integration löschen",
+          "message": "Möchten Sie \"{{name}}\" wirklich löschen? Dies kann nicht rückgängig gemacht werden.",
+          "confirm": "Löschen",
+          "success": "Integration erfolgreich gelöscht.",
+          "error": "Integration konnte nicht gelöscht werden."
+        },
+        "regenerate": {
+          "title": "Token neu generieren",
+          "description": "Ein neues Token ausstellen. Das vorherige funktioniert sofort nicht mehr.",
+          "button": "Neu generieren",
+          "success": "Token erfolgreich neu generiert.",
+          "error": "Token konnte nicht neu generiert werden.",
+          "tokenTitle": "Neues Integrationstoken",
+          "tokenWarning": "Kopieren Sie dieses neue Token jetzt. Es wird nicht erneut angezeigt."
+        },
+        "edit": {
+          "button": "Bearbeiten",
+          "title": "Integration bearbeiten",
+          "activeLabel": "Aktiv",
+          "inactiveBadge": "Deaktiviert",
+          "success": "Integration erfolgreich aktualisiert.",
+          "error": "Integration konnte nicht aktualisiert werden."
+        },
+        "columns": {
+          "name": "Name",
+          "type": "Typ",
+          "scopes": "Berechtigungen",
+          "lastUsed": "Zuletzt verwendet"
+        },
+        "token": {
+          "copy": "Token kopieren",
+          "copied": "Token in die Zwischenablage kopiert."
+        },
+        "caldav": {
+          "serverUrl": "Server-URL",
+          "username": "Benutzername",
+          "password": "Passwort"
+        }
+      },
+      "scheduling": {
+        "findATime": "Zeit finden",
+        "previousDay": "Vorheriger Tag",
+        "nextDay": "Nächster Tag",
+        "noConflicts": "Keine Konflikte",
+        "conflicts_one": "{{count}} Konflikt",
+        "conflicts_other": "{{count}} Konflikte",
+        "addAttendeesToSeeAvailability": "Teilnehmer hinzufügen, um Verfügbarkeit zu sehen"
+      },
+      "app_switcher": {
+        "you_are_in": "SIE SIND HIER",
+        "jump_to": "SPRINGEN ZU",
+        "switch_app": "App wechseln",
+        "apps": {
+          "epicentre": {
+            "label": "Epicentre",
+            "subtitle": "Startseite"
+          },
+          "docs": {
+            "label": "Docs",
+            "subtitle": "Dokumente"
+          },
+          "drive": {
+            "label": "Drive",
+            "subtitle": "Dateien"
+          },
+          "meet": {
+            "label": "Meet",
+            "subtitle": "Videoanrufe"
+          },
+          "mail": {
+            "label": "Mail",
+            "subtitle": "E-Mail"
+          },
+          "calendar": {
+            "label": "Calendar",
+            "subtitle": "Termine"
+          },
+          "chat": {
+            "label": "Chat",
+            "subtitle": "Nachrichten"
+          },
+          "commander": {
+            "label": "Commander",
+            "subtitle": "Verwaltung"
           }
         }
       }
@@ -2410,8 +2857,7 @@
         "noConflicts": "Geen conflicten",
         "conflicts": "{{count}} conflict(en)",
         "addAttendeesToSeeAvailability": "Voeg deelnemers toe om beschikbaarheid te zien"
-      }
-,
+      },
       "app_switcher": {
         "you_are_in": "JE BENT IN",
         "jump_to": "GA NAAR",
