@@ -5,7 +5,7 @@
  */
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { enUS, fr, nl, Locale } from "date-fns/locale";
+import { enUS, fr, de, nl, Locale } from "date-fns/locale";
 
 // Map i18n language codes to date-fns locales
 const DATE_FNS_LOCALES: Record<string, Locale> = {
@@ -15,6 +15,9 @@ const DATE_FNS_LOCALES: Record<string, Locale> = {
   fr: fr,
   "fr-fr": fr,
   "fr-FR": fr,
+  de: de,
+  "de-de": de,
+  "de-DE": de,
   nl: nl,
   "nl-nl": nl,
   "nl-NL": nl,
@@ -28,6 +31,9 @@ const INTL_LOCALES: Record<string, string> = {
   fr: "fr-FR",
   "fr-fr": "fr-FR",
   "fr-FR": "fr-FR",
+  de: "de-DE",
+  "de-de": "de-DE",
+  "de-DE": "de-DE",
   nl: "nl-NL",
   "nl-nl": "nl-NL",
   "nl-NL": "nl-NL",
@@ -41,6 +47,9 @@ const FIRST_DAY_OF_WEEK: Record<string, 0 | 1 | 2 | 3 | 4 | 5 | 6> = {
   fr: 1, // France: Monday
   "fr-fr": 1,
   "fr-FR": 1,
+  de: 1, // Germany: Monday
+  "de-de": 1,
+  "de-DE": 1,
   nl: 1, // Netherlands: Monday
   "nl-nl": 1,
   "nl-NL": 1,
