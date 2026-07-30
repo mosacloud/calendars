@@ -5,6 +5,7 @@ import {
   LanguagePicker,
   useResponsive,
 } from "@gouvfr-lasuite/ui-kit";
+import { GearRounded } from "@gouvfr-lasuite/ui-kit/icons";
 import { Button } from "@gouvfr-lasuite/cunningham-react";
 import { useAuth } from "@/features/auth/Auth";
 import { useEffect, useState } from "react";
@@ -93,7 +94,7 @@ const ApplicationMenu = () => {
     <DropdownMenu isOpen={isOpen} onOpenChange={setIsOpen} options={options}>
       <Button
         onClick={() => setIsOpen(true)}
-        icon={<Icon name="settings" type={IconType.OUTLINED} />}
+        icon={<GearRounded />}
         aria-label={t("settings.label")}
         color="brand"
         variant="tertiary"

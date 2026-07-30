@@ -80,6 +80,19 @@ body {
 .c__left-panel {
   border-right: none;
 }
+
+.c__button {
+  contain: content;
+}
+
+.c__button:disabled {
+  cursor: not-allowed;
+}
+
+.c__button--medium {
+  min-height: var(--c--components--button--medium-height);
+  height: auto;
+}
 .c__modal__backdrop {
   z-index: 1000;
 }

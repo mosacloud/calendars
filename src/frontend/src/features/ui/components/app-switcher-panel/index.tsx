@@ -4,97 +4,68 @@ import { Button } from "@gouvfr-lasuite/cunningham-react";
 import { useConfig } from "@/features/config/ConfigProvider";
 import "./index.scss";
 
-type AppId =
-  | "epicentre"
-  | "docs"
-  | "drive"
-  | "meet"
-  | "mail"
-  | "calendar"
-  | "chat"
-  | "commander";
+type AppId = "epicentre" | "docs" | "drive" | "meet" | "mail" | "calendar" | "chat" | "commander";
 
 const APP_META: Record<
   AppId,
   {
     icon: string;
-    label: string;
-    subtitle: string;
     color: string;
     gradientEnd: string;
   }
 > = {
   epicentre: {
     icon: "/images/icons/epicentre-icon.svg",
-    label: "Epicentre",
-    subtitle: "Home",
     color: "#0284C7",
     gradientEnd: "#0443F2",
   },
   docs: {
     icon: "/images/icons/file-icon.svg",
-    label: "Docs",
-    subtitle: "Documents",
     color: "#06B6D4",
     gradientEnd: "#0891B2",
   },
   drive: {
     icon: "/images/icons/folder-icon.svg",
-    label: "Drive",
-    subtitle: "Files",
     color: "#F2AF05",
     gradientEnd: "#D97706",
   },
   meet: {
     icon: "/images/icons/camera-icon.svg",
-    label: "Meet",
-    subtitle: "Video calls",
     color: "#00B574",
     gradientEnd: "#059669",
   },
   mail: {
     icon: "/images/icons/mail-icon.svg",
-    label: "Mail",
-    subtitle: "Email",
     color: "#F8497B",
     gradientEnd: "#A0033A",
   },
   calendar: {
     icon: "/images/icons/calendar-icon.svg",
-    label: "Calendar",
-    subtitle: "Schedule",
     color: "#A78BFA",
     gradientEnd: "#6D3FDE",
   },
   chat: {
     icon: "/images/icons/chat-icon.svg",
-    label: "Chat",
-    subtitle: "Messaging",
     color: "#FA7108",
     gradientEnd: "#C2410C",
   },
   commander: {
     icon: "/images/icons/commander-icon.svg",
-    label: "Commander",
-    subtitle: "Admin",
     color: "#0284C7",
     gradientEnd: "#0064C8",
   },
 };
 
-const APP_ORDER: AppId[] = [
-  "epicentre",
-  "docs",
-  "drive",
-  "meet",
-  "mail",
-  "calendar",
-  "chat",
-  "commander",
-];
+// Fixed order for the trigger button's decorative dot pattern — identical
+// across every Mosa app regardless of which app is current (matches Docs/Drive).
+const DOT_ORDER: AppId[] = ["epicentre", "drive", "meet", "mail", "calendar", "chat", "commander"];
+
+// "calendar" is this app itself and is intentionally omitted — it never appears in the jump-to list.
+const NAV_ORDER: AppId[] = ["epicentre", "docs", "drive", "meet", "mail", "chat", "commander"];
 
 const AppIcon = ({ id, size = 40 }: { id: AppId; size?: number }) => {
-  const { icon, label, color, gradientEnd } = APP_META[id];
+  const { t } = useTranslation();
+  const { icon, color, gradientEnd } = APP_META[id];
   const radius = size <= 36 ? 9 : 12;
   return (
     <span
@@ -108,7 +79,7 @@ const AppIcon = ({ id, size = 40 }: { id: AppId; size?: number }) => {
     >
       <img
         src={icon}
-        alt={label}
+        alt={t(`app_switcher.apps.${id}.label`)}
         style={{ width: size * 0.45, height: size * 0.45 }}
       />
     </span>
@@ -126,9 +97,7 @@ const Panel = ({
 }) => {
   const { t } = useTranslation();
 
-  const jumpTo = APP_ORDER.filter(
-    (id) => id !== "calendar" && id in appUrls && id in APP_META,
-  );
+  const jumpTo = NAV_ORDER.filter((id) => id in appUrls && id in APP_META);
 
   return (
     <div
@@ -140,9 +109,7 @@ const Panel = ({
       <div className="app-switcher-panel__current">
         <AppIcon id="calendar" size={44} />
         <div className="app-switcher-panel__current-text">
-          <span className="app-switcher-panel__you-are-in">
-            {t("app_switcher.you_are_in")}
-          </span>
+          <span className="app-switcher-panel__you-are-in">{t("app_switcher.you_are_in")}</span>
           <span className="app-switcher-panel__app-name">
             {t("app_switcher.apps.calendar.label")}
           </span>
@@ -152,17 +119,10 @@ const Panel = ({
       {jumpTo.length > 0 && (
         <>
           <div className="app-switcher-panel__divider" />
-          <span className="app-switcher-panel__section-label">
-            {t("app_switcher.jump_to")}
-          </span>
+          <span className="app-switcher-panel__section-label">{t("app_switcher.jump_to")}</span>
           <div className="app-switcher-panel__grid">
             {jumpTo.map((id) => (
-              <a
-                key={id}
-                href={appUrls[id]}
-                className="app-switcher-panel__app"
-                onClick={onClose}
-              >
+              <a key={id} href={appUrls[id]} className="app-switcher-panel__app" onClick={onClose}>
                 <AppIcon id={id} size={36} />
                 <div className="app-switcher-panel__app-info">
                   <span className="app-switcher-panel__app-label">
@@ -189,9 +149,7 @@ export const AppSwitcherButton = () => {
   const ref = useRef<HTMLDivElement>(null);
 
   const appUrls = config.APP_URLS ?? {};
-  const hasOtherApps = APP_ORDER.some(
-    (id) => id !== "calendar" && id in appUrls && id in APP_META,
-  );
+  const hasOtherApps = NAV_ORDER.some((id) => id in appUrls && id in APP_META);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -226,7 +184,7 @@ export const AppSwitcherButton = () => {
         icon={
           <span className="app-switcher-panel__trigger-grid" aria-hidden>
             <svg width="18" height="18" viewBox="0 0 18 18">
-              {[...APP_ORDER, APP_ORDER[0]].map((id, i) => (
+              {[...DOT_ORDER, DOT_ORDER[0], DOT_ORDER[1]].map((id, i) => (
                 <circle
                   key={i}
                   cx={3 + (i % 3) * 6}
@@ -240,11 +198,7 @@ export const AppSwitcherButton = () => {
         }
       />
       {isOpen && (
-        <Panel
-          onClose={() => setIsOpen(false)}
-          opensUpward={opensUpward}
-          appUrls={appUrls}
-        />
+        <Panel onClose={() => setIsOpen(false)} opensUpward={opensUpward} appUrls={appUrls} />
       )}
     </div>
   );
