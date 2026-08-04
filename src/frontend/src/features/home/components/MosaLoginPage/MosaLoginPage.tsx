@@ -154,14 +154,16 @@ export const MosaLoginPage = () => {
       </div>
 
       <div className="mosa-login__form-panel">
-        <div className="mosa-login__lang-wrapper">
-          <LanguageSelector />
-        </div>
-
         <div className="mosa-login__mobile-accents" />
 
-        <div className="mosa-login__mobile-header">
-          <img src="/logos/mosa-cloud-logo.svg" alt="mosa.cloud" />
+        <div className="mosa-login__topbar">
+          <div className="mosa-login__mobile-header">
+            <img src="/logos/mosa-cloud-logo.svg" alt="mosa.cloud" />
+          </div>
+
+          <div className="mosa-login__lang-wrapper">
+            <LanguageSelector />
+          </div>
         </div>
 
         <div className="mosa-login__form-container">
