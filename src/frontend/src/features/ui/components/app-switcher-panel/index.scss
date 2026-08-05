@@ -54,6 +54,15 @@ $mosa-ease:          cubic-bezier(0.4, 0, 0.2, 1);
     margin: 0 auto;
     width: auto;
     max-width: 312px;
+    max-height: calc(100vh - 76px);
+    overflow-y: auto;
+    box-sizing: border-box;
+
+    &--up {
+      top: auto;
+      bottom: 68px;
+      max-height: calc(100vh - 84px);
+    }
   }
 }
 
