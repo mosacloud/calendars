@@ -152,11 +152,27 @@ $app-gradient-end: #6d3fde;
     }
   }
 
+  &__topbar {
+    @media (max-width: 900px) {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 440px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 1.5rem;
+    }
+  }
+
   &__lang-wrapper {
     position: absolute;
     top: 1.5rem;
     right: 1.5rem;
     z-index: 10;
+
+    @media (max-width: 900px) {
+      position: static;
+    }
   }
 
   &__lang-container {
@@ -247,12 +263,14 @@ $app-gradient-end: #6d3fde;
     @media (max-width: 900px) {
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
 
       img {
         height: 1.75rem;
         width: auto;
+
+        @media (max-width: 360px) {
+          height: 1.4rem;
+        }
       }
     }
   }
