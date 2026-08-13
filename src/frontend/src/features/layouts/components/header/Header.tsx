@@ -120,52 +120,50 @@ export const HeaderRight = () => {
   );
 };
 
+const PICKER_LANGUAGES = [
+  { label: "Français", value: "fr-fr", shortLabel: "FR" },
+  { label: "English", value: "en-us", shortLabel: "EN" },
+  { label: "Nederlands", value: "nl-nl", shortLabel: "NL" },
+  { label: "Deutsch", value: "de-de", shortLabel: "DE" },
+];
+
+const toPickerLanguage = (lng?: string) => {
+  if (!lng) return undefined;
+  const base = lng.toLowerCase().split("-")[0];
+  return PICKER_LANGUAGES.find((language) => language.value.startsWith(base))?.value;
+};
+
 export const LanguagePickerUserMenu = () => {
   const { i18n } = useTranslation();
   const { user, refreshUser } = useAuth();
-  const [selectedLanguage, setSelectedLanguage] = useState(user?.language);
+  const [selectedLanguage, setSelectedLanguage] = useState(
+    user?.language ?? toPickerLanguage(i18n.language),
+  );
 
   // Sync the user's backend language into the picker state and into i18next on
   // load and whenever the user object updates. The backend value is the source
   // of truth — it's also used server-side for email invitations.
   useEffect(() => {
-    if (!user?.language) return;
-    setSelectedLanguage(user.language);
-    if (i18n.language !== user.language) {
-      i18n.changeLanguage(user.language).catch((err) => {
-        console.error("Error changing language", err);
-      });
+    if (user?.language) {
+      setSelectedLanguage(user.language);
+      if (i18n.language !== user.language) {
+        i18n.changeLanguage(user.language).catch((err) => {
+          console.error("Error changing language", err);
+        });
+      }
+      return;
     }
+
+    const syncFromI18n = (lng: string) => setSelectedLanguage(toPickerLanguage(lng));
+    syncFromI18n(i18n.language);
+    i18n.on("languageChanged", syncFromI18n);
+    return () => i18n.off("languageChanged", syncFromI18n);
   }, [user?.language, i18n]);
 
-  // We must set the language to lowercase because django does not use "en-US", but "en-us".
-
-  const languages = [
-    {
-      label: "Français",
-      value: "fr-fr",
-      shortLabel: "FR",
-      isChecked: selectedLanguage === "fr-fr",
-    },
-    {
-      label: "English",
-      value: "en-us",
-      shortLabel: "EN",
-      isChecked: selectedLanguage === "en-us",
-    },
-    {
-      label: "Nederlands",
-      value: "nl-nl",
-      shortLabel: "NL",
-      isChecked: selectedLanguage === "nl-nl",
-    },
-    {
-      label: "Deutsch",
-      value: "de-de",
-      shortLabel: "DE",
-      isChecked: selectedLanguage === "de-de",
-    },
-  ];
+  const languages = PICKER_LANGUAGES.map((language) => ({
+    ...language,
+    isChecked: selectedLanguage === language.value,
+  }));
 
   const onChange = (value: string) => {
     setSelectedLanguage(value);
