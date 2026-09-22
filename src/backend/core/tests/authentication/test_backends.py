@@ -25,6 +25,7 @@ _no_org_resolve = mock.patch(
 
 
 @_no_org_resolve
+@override_settings(OIDC_STORE_CLAIMS=[])
 def test_authentication_getter_existing_user_no_email(
     django_assert_num_queries, monkeypatch
 ):
@@ -157,6 +158,7 @@ def test_authentication_getter_existing_user_no_fallback_to_email_no_duplicate(
 
 
 @_no_org_resolve
+@override_settings(OIDC_STORE_CLAIMS=[])
 def test_authentication_getter_existing_user_with_email(
     django_assert_num_queries, monkeypatch
 ):
@@ -605,3 +607,84 @@ def test_authentication_new_user_org_claim_also_in_store_claims(monkeypatch):
     assert user.organization is not None
     assert user.organization.external_id == "13002526500013"
     assert user.claims == {"siret": "13002526500013"}
+
+
+def test_authentication_sets_language_from_locale_claim(monkeypatch):
+    """
+    Real path: get_or_create_user() sets User.language from the OIDC "locale"
+    claim, not just compute_language() called in isolation.
+    """
+    klass = OIDCAuthenticationBackend()
+
+    def get_userinfo_mocked(*args):
+        return {
+            "sub": "789",
+            "email": "locale-claim@example.com",
+            "first_name": "John",
+            "last_name": "Doe",
+            "locale": "nl-NL",
+        }
+
+    monkeypatch.setattr(OIDCAuthenticationBackend, "get_userinfo", get_userinfo_mocked)
+
+    user = klass.get_or_create_user(
+        access_token="test-token", id_token=None, payload=None
+    )
+
+    assert user.language == "nl-nl"
+
+
+def test_authentication_recognized_locale_claim_overrides_existing_language(
+    monkeypatch,
+):
+    """
+    A recognized "locale" claim overrides an existing, different language on
+    every login — Epicentre/Hub is the single source of truth for language,
+    so a re-login must not leave a stale value in place.
+    """
+    klass = OIDCAuthenticationBackend()
+    UserFactory(email="recognized-locale@example.com", sub="789", language="fr-fr")
+
+    def get_userinfo_mocked(*args):
+        return {
+            "sub": "789",
+            "email": "recognized-locale@example.com",
+            "first_name": "John",
+            "last_name": "Doe",
+            "locale": "nl-NL",
+        }
+
+    monkeypatch.setattr(OIDCAuthenticationBackend, "get_userinfo", get_userinfo_mocked)
+
+    user = klass.get_or_create_user(
+        access_token="test-token", id_token=None, payload=None
+    )
+
+    user.refresh_from_db()
+    assert user.language == "nl-nl"
+
+
+def test_authentication_unsupported_locale_claim_does_not_override_language(
+    monkeypatch,
+):
+    """An unrecognized "locale" claim never overrides an existing language."""
+    klass = OIDCAuthenticationBackend()
+    UserFactory(email="unsupported-locale@example.com", sub="789", language="fr-fr")
+
+    def get_userinfo_mocked(*args):
+        return {
+            "sub": "789",
+            "email": "unsupported-locale@example.com",
+            "first_name": "John",
+            "last_name": "Doe",
+            "locale": "es",
+        }
+
+    monkeypatch.setattr(OIDCAuthenticationBackend, "get_userinfo", get_userinfo_mocked)
+
+    user = klass.get_or_create_user(
+        access_token="test-token", id_token=None, payload=None
+    )
+
+    user.refresh_from_db()
+    assert user.language == "fr-fr"
