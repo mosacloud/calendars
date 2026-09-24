@@ -345,6 +345,7 @@ def test_api_users_retrieve_me_authenticated():
         "full_name": user.full_name,
         "picture": None,
         "language": user.language,
+        "language_confirmed_by_idp": False,
         "timezone": str(user.timezone),
         "can_access": True,
         "can_admin": True,
@@ -367,6 +368,19 @@ def test_api_users_retrieve_me_picture_from_claims():
 
     assert response.status_code == 200
     assert response.json()["picture"] == "https://example.com/avatar.png"
+
+
+def test_api_users_retrieve_me_language_confirmed_by_idp_from_claims():
+    """ "language_confirmed_by_idp" should reflect a usable OIDC "locale" claim."""
+    user = factories.UserFactory(claims={"locale": "nl"})
+
+    client = APIClient()
+    client.force_login(user)
+
+    response = client.get("/api/v1.0/users/me/")
+
+    assert response.status_code == 200
+    assert response.json()["language_confirmed_by_idp"] is True
 
 
 def test_api_users_retrieve_me_picture_ignores_non_string_claim():

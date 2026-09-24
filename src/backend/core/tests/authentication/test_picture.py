@@ -12,8 +12,8 @@ pytestmark = pytest.mark.django_db
 def test_authentication_sets_picture_from_claim(monkeypatch):
     """
     Real path: a "picture" claim in the userinfo response ends up in
-    User.claims (via the default OIDC_STORE_CLAIMS=["picture"]) and is
-    exposed through the User.picture property, not just constructed
+    User.claims (via the default OIDC_STORE_CLAIMS=["picture", "locale"])
+    and is exposed through the User.picture property, not just constructed
     directly on a factory instance.
     """
     klass = OIDCAuthenticationBackend()
@@ -33,7 +33,7 @@ def test_authentication_sets_picture_from_claim(monkeypatch):
         access_token="test-token", id_token=None, payload=None
     )
 
-    assert user.claims == {"picture": "https://example.com/avatar.png"}
+    assert user.claims == {"picture": "https://example.com/avatar.png", "locale": None}
     assert user.picture == "https://example.com/avatar.png"
 
 

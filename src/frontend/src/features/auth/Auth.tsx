@@ -1,13 +1,29 @@
 import React, { PropsWithChildren, useCallback, useEffect, useState } from "react";
 
 import i18n from "@/features/i18n/initI18n";
+import { IS_LANGUAGE_FORCED, LANGUAGE_LOCAL_STORAGE } from "@/features/i18n/conf";
 import { fetchAPI } from "@/features/api/fetchApi";
 import { User } from "@/features/auth/types";
 import { baseApiUrl } from "../api/utils";
 import { APIError } from "../api/APIError";
 import { SpinnerPage } from "@/features/ui/components/spinner/SpinnerPage";
 
+// The remembered interface language *is* dropped on logout: it is a single
+// key/cookie shared by every visitor of this browser, and the identity-provider
+// sync below writes the signed-in user's language into it. Keeping it would
+// boot the next visitor of a shared machine into the previous user's language.
+const forgetRememberedLanguage = () => {
+  try {
+    localStorage.removeItem(LANGUAGE_LOCAL_STORAGE);
+    document.cookie = "calendars_language=; path=/; max-age=0";
+  } catch {
+    // Storage can be unavailable (private mode, blocked cookies); never let
+    // that stop the sign-out itself.
+  }
+};
+
 export const logout = () => {
+  forgetRememberedLanguage();
   window.location.replace(new URL("logout/", baseApiUrl()).href);
 };
 
@@ -69,15 +85,20 @@ export const Auth = ({ children, redirect }: PropsWithChildren & { redirect?: bo
   }, [shouldRedirectNoAccess]);
 
   // Sync the logged-in user's saved language into i18next as soon as the user
-  // loads. The backend value is the source of truth (it's also used for email
-  // invitations). This must live in this always-mounted provider — not in the
-  // language picker, which only mounts when the user opens the menu — otherwise
-  // the UI stays on the browser-detected language until the menu is opened.
+  // loads. The backend value comes from the identity provider's OIDC "locale"
+  // claim, so it outranks whatever was picked on the pre-login page or
+  // detected from the browser — but only when the identity provider actually
+  // asserted it: `language` is nullable but, once set, can't say whether it
+  // came from the IdP or an earlier manual state, and there is no in-app
+  // language picker to fall back on if we got this wrong (language can only
+  // be changed pre-login, on the login page).
   useEffect(() => {
-    if (user?.language && i18n.language !== user.language) {
+    if (IS_LANGUAGE_FORCED) return;
+    if (!user?.language_confirmed_by_idp || !user.language) return;
+    if (i18n.language !== user.language) {
       void i18n.changeLanguage(user.language);
     }
-  }, [user?.language]);
+  }, [user?.language, user?.language_confirmed_by_idp]);
 
   if (user === undefined || shouldRedirectNoAccess) {
     return <SpinnerPage />;

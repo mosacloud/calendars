@@ -724,9 +724,12 @@ class Base(Configuration):
         environ_prefix=None,
     )
 
-    # OIDC claims to store
+    # OIDC claims to store. "locale" is kept next to the mapped User.language:
+    # that column is nullable but cannot say whether the identity provider
+    # asserted anything once set — and the raw claim is what you want to
+    # inspect when someone reports that their language never syncs.
     OIDC_STORE_CLAIMS = values.ListValue(
-        default=["picture"],
+        default=["picture", "locale"],
         environ_name="OIDC_STORE_CLAIMS",
         environ_prefix=None,
     )
@@ -751,7 +754,7 @@ class Base(Configuration):
     )
 
     OIDC_USERINFO_FULLNAME_FIELDS = values.ListValue(
-        default=["first_name", "last_name"],
+        default=["first_name", "last_name", "given_name", "family_name"],
         environ_name="OIDC_USERINFO_FULLNAME_FIELDS",
         environ_prefix=None,
     )

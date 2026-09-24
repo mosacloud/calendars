@@ -77,12 +77,14 @@ class UserMeSerializer(UserSerializer):
             "can_access",
             "can_admin",
             "organization",
+            "language_confirmed_by_idp",
         ]
         read_only_fields = [
             *UserSerializer.Meta.read_only_fields,
             "can_access",
             "can_admin",
             "organization",
+            "language_confirmed_by_idp",
         ]
 
     def _get_entitlements(self, user):

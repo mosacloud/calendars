@@ -44,3 +44,19 @@ def test_models_users_send_mail_main_missing():
         user.email_user("my subject", "my message")
 
     assert str(excinfo.value) == "User has no email address."
+
+
+def test_models_users_language_confirmed_by_idp_true():
+    """True when the stored claims carry a usable OIDC "locale"."""
+    user = factories.UserFactory(claims={"locale": "nl"})
+    assert user.language_confirmed_by_idp is True
+
+
+def test_models_users_language_confirmed_by_idp_false():
+    """False when the stored claims have no usable "locale" (or none at all).
+
+    ``language`` being set is not enough on its own — it could come from a
+    pre-login pick rather than the identity provider.
+    """
+    user = factories.UserFactory(claims={}, language="nl-nl")
+    assert user.language_confirmed_by_idp is False
