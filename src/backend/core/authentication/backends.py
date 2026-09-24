@@ -9,6 +9,7 @@ from lasuite.oidc_login.backends import (
     OIDCAuthenticationBackend as LaSuiteOIDCAuthenticationBackend,
 )
 
+from core.authentication.language import compute_language
 from core.entitlements import EntitlementsUnavailableError, get_user_entitlements
 from core.models import DuplicateEmailError, Organization
 
@@ -90,6 +91,9 @@ class OIDCAuthenticationBackend(LaSuiteOIDCAuthenticationBackend):
         org_claim = settings.OIDC_USERINFO_ORGANIZATION_CLAIM
         if org_claim:
             extra[org_claim] = user_info.get(org_claim)
+        language = compute_language(user_info)
+        if language:
+            extra["language"] = language
         return extra
 
     def get_existing_user(self, sub, email):

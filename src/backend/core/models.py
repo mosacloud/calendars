@@ -17,6 +17,7 @@ from django.db import models
 from encrypted_fields.fields import EncryptedJSONField
 from timezone_field import TimeZoneField
 
+from core.authentication.language import compute_language
 from core.enums import (
     CHANNEL_SCOPE_COLLECTION_METHODS,
     CHANNEL_SCOPE_OBJECT_METHODS,
@@ -268,6 +269,29 @@ class User(AbstractBaseUser, BaseModel, auth_models.PermissionsMixin):
         if not self.email:
             raise ValueError("User has no email address.")
         mail.send_mail(subject, message, from_email, [self.email], **kwargs)
+
+    @property
+    def picture(self):
+        """Profile picture URL from the OIDC provider, if any."""
+        picture = self.claims.get("picture")
+        return picture if isinstance(picture, str) else None
+
+    @property
+    def language_confirmed_by_idp(self):
+        """Whether the identity provider asserted a language we can honour.
+
+        ``language`` is nullable but, once set, cannot distinguish an
+        IdP-asserted preference from a value picked on the pre-login page
+        (see ``MosaLoginPage``'s language selector) — so applying it blindly
+        on every load would clobber that pre-login choice for any user whose
+        IdP sends no usable locale. Exposed on ``UserMeSerializer`` for the
+        frontend's auto-apply effect, and for parity with the sibling Mosa
+        apps that expose the same field.
+
+        Derived from the stored claim rather than recorded at login, so it is
+        available to any request and for any user, not just an OIDC session.
+        """
+        return compute_language(self.claims) is not None
 
 
 def uuid_to_urlsafe(u):

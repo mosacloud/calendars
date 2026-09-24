@@ -17,8 +17,9 @@ import resources from "./translations.json";
  * - First visit on the website, the user is not logged in, we detect the browser current language with LanguageDetector
  * - When the user logs in, its language attribute is null
  * - Because the user language is null, we use the language detected by LanguageDetector
- * - If the user changes the language via the language picker, we update the language of the user via a request to the backend
- * - When the user object is fetched/refreshed, LanguagePickerUserMenu syncs user.language back into i18next (see Header.tsx)
+ * - Language can only be changed pre-login, via the login page's language selector — there is no in-app picker
+ * - When the user object is fetched/refreshed, Auth.tsx syncs user.language back into i18next, but only once
+ *   the identity provider actually asserted it (user.language_confirmed_by_idp)
  *
  * This way we ensure that we use the most probable language of the user.
  */

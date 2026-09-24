@@ -343,7 +343,9 @@ def test_api_users_retrieve_me_authenticated():
         "id": str(user.id),
         "email": user.email,
         "full_name": user.full_name,
+        "picture": None,
         "language": user.language,
+        "language_confirmed_by_idp": False,
         "timezone": str(user.timezone),
         "can_access": True,
         "can_admin": True,
@@ -353,6 +355,45 @@ def test_api_users_retrieve_me_authenticated():
             "sharing_level": "freebusy",
         },
     }
+
+
+def test_api_users_retrieve_me_picture_from_claims():
+    """The "picture" field should reflect the OIDC "picture" claim, if any."""
+    user = factories.UserFactory(claims={"picture": "https://example.com/avatar.png"})
+
+    client = APIClient()
+    client.force_login(user)
+
+    response = client.get("/api/v1.0/users/me/")
+
+    assert response.status_code == 200
+    assert response.json()["picture"] == "https://example.com/avatar.png"
+
+
+def test_api_users_retrieve_me_language_confirmed_by_idp_from_claims():
+    """ "language_confirmed_by_idp" should reflect a usable OIDC "locale" claim."""
+    user = factories.UserFactory(claims={"locale": "nl"})
+
+    client = APIClient()
+    client.force_login(user)
+
+    response = client.get("/api/v1.0/users/me/")
+
+    assert response.status_code == 200
+    assert response.json()["language_confirmed_by_idp"] is True
+
+
+def test_api_users_retrieve_me_picture_ignores_non_string_claim():
+    """A non-string "picture" claim should not be exposed as-is."""
+    user = factories.UserFactory(claims={"picture": {"unexpected": "object"}})
+
+    client = APIClient()
+    client.force_login(user)
+
+    response = client.get("/api/v1.0/users/me/")
+
+    assert response.status_code == 200
+    assert response.json()["picture"] is None
 
 
 def test_api_users_retrieve_anonymous():

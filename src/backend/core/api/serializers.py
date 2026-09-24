@@ -48,10 +48,11 @@ class UserSerializer(serializers.ModelSerializer):
             "id",
             "email",
             "full_name",
+            "picture",
             "language",
             "timezone",
         ]
-        read_only_fields = ["id", "email", "full_name"]
+        read_only_fields = ["id", "email", "full_name", "picture"]
 
     def get_email(self, user) -> str | None:
         """Return OIDC email, falling back to admin_email for staff users."""
@@ -76,12 +77,14 @@ class UserMeSerializer(UserSerializer):
             "can_access",
             "can_admin",
             "organization",
+            "language_confirmed_by_idp",
         ]
         read_only_fields = [
             *UserSerializer.Meta.read_only_fields,
             "can_access",
             "can_admin",
             "organization",
+            "language_confirmed_by_idp",
         ]
 
     def _get_entitlements(self, user):

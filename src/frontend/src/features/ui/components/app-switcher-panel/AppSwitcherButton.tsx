@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@gouvfr-lasuite/cunningham-react";
 import { useConfig } from "@/features/config/ConfigProvider";
-import "./index.scss";
+import "./AppSwitcherButton.scss";
 
 type AppId = "epicentre" | "docs" | "drive" | "meet" | "mail" | "calendar" | "chat" | "commander";
 
@@ -105,6 +105,8 @@ const Panel = ({
       style={{
         background: `linear-gradient(180deg, color-mix(in srgb, ${APP_META.calendar.color} 8%, transparent) 0%, transparent 100%) top center / 100% 80px no-repeat, #ffffff`,
       }}
+      role="dialog"
+      aria-label={t("app_switcher.switch_app")}
     >
       <div className="app-switcher-panel__current">
         <AppIcon id="calendar" size={44} />
@@ -151,25 +153,51 @@ export const AppSwitcherButton = () => {
   const appUrls = config.APP_URLS ?? {};
   const hasOtherApps = NAV_ORDER.some((id) => id in appUrls && id in APP_META);
 
+  const measure = () => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    setOpensUpward(window.innerHeight - rect.bottom < 320);
+  };
+
   useEffect(() => {
     if (!isOpen) return;
-    const handler = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+        ref.current?.querySelector("button")?.focus();
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   if (!hasOtherApps) return null;
 
   const handleOpen = () => {
-    if (ref.current) {
-      const rect = ref.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      setOpensUpward(spaceBelow < 320);
-    }
+    measure();
     setIsOpen((v) => !v);
   };
 
@@ -179,6 +207,7 @@ export const AppSwitcherButton = () => {
         color="brand"
         variant="tertiary"
         aria-label={t("app_switcher.switch_app")}
+        aria-haspopup="dialog"
         aria-expanded={isOpen}
         onClick={handleOpen}
         icon={
