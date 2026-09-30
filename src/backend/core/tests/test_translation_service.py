@@ -66,11 +66,11 @@ class TestNormalizeLang:  # pylint: disable=missing-function-docstring
     def test_normalize_simple(self):
         assert TranslationService.normalize_lang("fr") == "fr"
 
-    def test_normalize_unknown_falls_back_to_fr(self):
-        assert TranslationService.normalize_lang("es") == "fr"
+    def test_normalize_unknown_falls_back_to_default(self):
+        assert TranslationService.normalize_lang("es") == "en"
 
     def test_normalize_empty(self):
-        assert TranslationService.normalize_lang("") == "fr"
+        assert TranslationService.normalize_lang("") == "en"
 
 
 class TestFormatDate:
