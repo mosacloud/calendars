@@ -58,8 +58,8 @@ export const ChevronDown = ({ rotated }: ChevronDownProps) => (
     strokeLinecap="round"
     strokeLinejoin="round"
     style={{
-      transform: rotated ? 'rotate(180deg)' : 'none',
-      transition: 'transform 0.15s ease',
+      transform: rotated ? "rotate(180deg)" : "none",
+      transition: "transform 0.15s ease",
     }}
   >
     <polyline points="6 9 12 15 18 9" />

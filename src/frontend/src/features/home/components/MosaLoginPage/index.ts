@@ -1,1 +1,1 @@
-export { MosaLoginPage } from './MosaLoginPage';
+export { MosaLoginPage } from "./MosaLoginPage";

@@ -1,20 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
-import { login } from '@/features/auth/Auth';
+import { login } from "@/features/auth/Auth";
 
-import {
-  ArrowRight,
-  ChevronDown,
-  EuStars,
-  GlobeIcon,
-} from './MosaLoginPage.icons';
+import { ArrowRight, ChevronDown, EuStars, GlobeIcon } from "./MosaLoginPage.icons";
 
 const LANGUAGES = [
-  { code: 'en', value: 'en-us', label: 'EN' },
-  { code: 'nl', value: 'nl-nl', label: 'NL' },
-  { code: 'fr', value: 'fr-fr', label: 'FR' },
-  { code: 'de', value: 'de-de', label: 'DE' },
+  { code: "en", value: "en-us", label: "EN" },
+  { code: "nl", value: "nl-nl", label: "NL" },
+  { code: "fr", value: "fr-fr", label: "FR" },
+  { code: "de", value: "de-de", label: "DE" },
 ];
 
 const LanguageSelector = () => {
@@ -23,7 +18,7 @@ const LanguageSelector = () => {
   const ref = useRef<HTMLDivElement>(null);
 
   const currentLang = useMemo(() => {
-    const lang = i18n.language?.split('-')[0] || 'en';
+    const lang = i18n.language?.split("-")[0] || "en";
     return LANGUAGES.find((l) => l.code === lang) || LANGUAGES[0];
   }, [i18n.language]);
 
@@ -33,24 +28,20 @@ const LanguageSelector = () => {
         setIsOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleSelect = (lang: (typeof LANGUAGES)[0]) => {
     i18n.changeLanguage(lang.value).catch((err) => {
-      console.error('Error changing language', err);
+      console.error("Error changing language", err);
     });
     setIsOpen(false);
   };
 
   return (
     <div className="mosa-login__lang-container" ref={ref}>
-      <button
-        className="mosa-login__lang-button"
-        onClick={() => setIsOpen(!isOpen)}
-        type="button"
-      >
+      <button className="mosa-login__lang-button" onClick={() => setIsOpen(!isOpen)} type="button">
         <GlobeIcon />
         <span>{currentLang.label}</span>
         <ChevronDown rotated={isOpen} />
@@ -60,7 +51,7 @@ const LanguageSelector = () => {
           {LANGUAGES.map((lang) => (
             <button
               key={lang.code}
-              className={`mosa-login__lang-option ${currentLang.code === lang.code ? 'mosa-login__lang-option--selected' : ''}`}
+              className={`mosa-login__lang-option ${currentLang.code === lang.code ? "mosa-login__lang-option--selected" : ""}`}
               onClick={() => handleSelect(lang)}
               type="button"
             >
@@ -77,7 +68,7 @@ export const MosaLoginPage = () => {
   const { t } = useTranslation();
 
   useEffect(() => {
-    document.title = t('mosa.login.page_title');
+    document.title = t("mosa.login.page_title");
   }, [t]);
 
   const handleLogin = () => {
@@ -93,51 +84,51 @@ export const MosaLoginPage = () => {
         <div
           className="mosa-login__accent-dot"
           style={{
-            left: '64px',
-            top: 'calc(50% - 160px)',
-            width: '4px',
-            height: '4px',
-            background: 'rgba(255, 255, 255, 0.5)',
+            left: "64px",
+            top: "calc(50% - 160px)",
+            width: "4px",
+            height: "4px",
+            background: "rgba(255, 255, 255, 0.5)",
           }}
         />
         <div
           className="mosa-login__accent-dot"
           style={{
-            left: '256px',
-            top: 'calc(50% - 224px)',
-            width: '12px',
-            height: '12px',
-            background: 'rgba(255, 255, 255, 0.7)',
+            left: "256px",
+            top: "calc(50% - 224px)",
+            width: "12px",
+            height: "12px",
+            background: "rgba(255, 255, 255, 0.7)",
           }}
         />
         <div
           className="mosa-login__accent-dot"
           style={{
-            left: '64px',
-            top: 'calc(50% + 96px)',
-            width: '5px',
-            height: '5px',
-            background: 'rgba(255, 255, 255, 0.55)',
+            left: "64px",
+            top: "calc(50% + 96px)",
+            width: "5px",
+            height: "5px",
+            background: "rgba(255, 255, 255, 0.55)",
           }}
         />
         <div
           className="mosa-login__accent-dot"
           style={{
-            left: '192px',
-            top: 'calc(50% + 224px)',
-            width: '6px',
-            height: '6px',
-            background: 'rgba(255, 255, 255, 0.55)',
+            left: "192px",
+            top: "calc(50% + 224px)",
+            width: "6px",
+            height: "6px",
+            background: "rgba(255, 255, 255, 0.55)",
           }}
         />
         <div
           className="mosa-login__accent-dot"
           style={{
-            left: '384px',
-            top: 'calc(50% + 160px)',
-            width: '4px',
-            height: '4px',
-            background: 'rgba(255, 255, 255, 0.4)',
+            left: "384px",
+            top: "calc(50% + 160px)",
+            width: "4px",
+            height: "4px",
+            background: "rgba(255, 255, 255, 0.4)",
           }}
         />
 
@@ -149,7 +140,7 @@ export const MosaLoginPage = () => {
           <div className="mosa-login__eu-flag">
             <EuStars />
           </div>
-          <span>{t('mosa.login.built_in_eu')}</span>
+          <span>{t("mosa.login.built_in_eu")}</span>
         </div>
       </div>
 
@@ -168,11 +159,9 @@ export const MosaLoginPage = () => {
 
         <div className="mosa-login__form-container">
           <div className="mosa-login__form-header">
-            <p className="mosa-login__eyebrow">
-              {t('mosa.login.product_description')}
-            </p>
+            <p className="mosa-login__eyebrow">{t("mosa.login.product_description")}</p>
             <h2>
-              {t('mosa.login.welcome_to')}{' '}
+              {t("mosa.login.welcome_to")}{" "}
               <span className="mosa-login__product-highlight">Calendar</span>
             </h2>
           </div>
@@ -180,19 +169,15 @@ export const MosaLoginPage = () => {
           <div className="mosa-login__divider" />
 
           <div className="mosa-login__actions">
-            <button
-              className="mosa-login__primary-button"
-              onClick={handleLogin}
-              type="button"
-            >
-              <span>{t('mosa.login.sign_in_button')}</span>
+            <button className="mosa-login__primary-button" onClick={handleLogin} type="button">
+              <span>{t("mosa.login.sign_in_button")}</span>
               <ArrowRight />
             </button>
           </div>
 
           <p className="mosa-login__signup-prompt">
-            {t('mosa.login.no_account')}{' '}
-            <a href="mailto:hi@mosa.cloud">{t('mosa.login.contact_us')}</a>
+            {t("mosa.login.no_account")}{" "}
+            <a href="mailto:hi@mosa.cloud">{t("mosa.login.contact_us")}</a>
           </p>
         </div>
 
@@ -200,7 +185,7 @@ export const MosaLoginPage = () => {
           <div className="mosa-login__mobile-eu-flag">
             <EuStars />
           </div>
-          <span>{t('mosa.login.built_in_eu')}</span>
+          <span>{t("mosa.login.built_in_eu")}</span>
         </div>
       </div>
     </div>
