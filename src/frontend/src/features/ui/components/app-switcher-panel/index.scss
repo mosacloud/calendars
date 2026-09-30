@@ -1,13 +1,16 @@
 /* Mosa brand tokens */
-$mosa-surface:       #ffffff;
-$mosa-bg:            #f7f8fa;
-$mosa-border:        #e6eaf1;
-$mosa-ink:           #333333;
-$mosa-graphite:      #5a6577;
-$mosa-shadow-elev:   0 2px 4px rgba(0,0,0,.02), 0 4px 8px rgba(0,0,0,.03),
-                     0 8px 16px rgba(0,0,0,.04), 0 16px 32px rgba(0,0,0,.05),
-                     0 32px 64px rgba(0,0,0,.08);
-$mosa-ease:          cubic-bezier(0.4, 0, 0.2, 1);
+$mosa-surface: #ffffff;
+$mosa-bg: #f7f8fa;
+$mosa-border: #e6eaf1;
+$mosa-ink: #333333;
+$mosa-graphite: #5a6577;
+$mosa-shadow-elev:
+  0 2px 4px rgba(0, 0, 0, 0.02),
+  0 4px 8px rgba(0, 0, 0, 0.03),
+  0 8px 16px rgba(0, 0, 0, 0.04),
+  0 16px 32px rgba(0, 0, 0, 0.05),
+  0 32px 64px rgba(0, 0, 0, 0.08);
+$mosa-ease: cubic-bezier(0.4, 0, 0.2, 1);
 
 /* ── Trigger ─────────────────────────────────────────────── */
 .app-switcher-panel {
@@ -67,8 +70,14 @@ $mosa-ease:          cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes mosa-panel-in {
-  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* ── "You're in" header ──────────────────────────────────── */
@@ -86,7 +95,7 @@ $mosa-ease:          cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .app-switcher-panel__you-are-in {
-  font-family: 'Poppins', system-ui, sans-serif;
+  font-family: "Poppins", system-ui, sans-serif;
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -95,7 +104,7 @@ $mosa-ease:          cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .app-switcher-panel__app-name {
-  font-family: 'Poppins', system-ui, sans-serif;
+  font-family: "Poppins", system-ui, sans-serif;
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -112,7 +121,7 @@ $mosa-ease:          cubic-bezier(0.4, 0, 0.2, 1);
 /* ── "Jump to" section ───────────────────────────────────── */
 .app-switcher-panel__section-label {
   display: block;
-  font-family: 'Poppins', system-ui, sans-serif;
+  font-family: "Poppins", system-ui, sans-serif;
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -152,7 +161,7 @@ $mosa-ease:          cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .app-switcher-panel__app-label {
-  font-family: 'Poppins', system-ui, sans-serif;
+  font-family: "Poppins", system-ui, sans-serif;
   font-size: 0.8125rem;
   font-weight: 600;
   color: $mosa-ink;

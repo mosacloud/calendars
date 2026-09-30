@@ -27,8 +27,8 @@ $app-gradient-end: #6d3fde;
 }
 
 .mosa-login {
-  --font-heading: 'Poppins', sans-serif;
-  --font-body: 'Open Sans', sans-serif;
+  --font-heading: "Poppins", sans-serif;
+  --font-body: "Open Sans", sans-serif;
   --app-color: #{$app-color};
   --app-gradient-end: #{$app-gradient-end};
   min-height: 100vh;
@@ -64,12 +64,21 @@ $app-gradient-end: #6d3fde;
   &__grid-overlay {
     position: absolute;
     inset: 0;
-    background-image: linear-gradient(rgba(255, 255, 255, 0.13) 1px, transparent 1px),
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.13) 1px, transparent 1px),
       linear-gradient(90deg, rgba(255, 255, 255, 0.13) 1px, transparent 1px);
     background-size: 64px 64px;
     background-position: left center;
-    mask-image: radial-gradient(ellipse 68% 65% at 0% 50%, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0) 100%);
-    -webkit-mask-image: radial-gradient(ellipse 68% 65% at 0% 50%, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0) 100%);
+    mask-image: radial-gradient(
+      ellipse 68% 65% at 0% 50%,
+      rgba(0, 0, 0, 1) 0%,
+      rgba(0, 0, 0, 0) 100%
+    );
+    -webkit-mask-image: radial-gradient(
+      ellipse 68% 65% at 0% 50%,
+      rgba(0, 0, 0, 1) 0%,
+      rgba(0, 0, 0, 0) 100%
+    );
   }
 
   &__accent-dot {
@@ -148,7 +157,11 @@ $app-gradient-end: #6d3fde;
     @media (max-width: 900px) {
       min-height: 100vh;
       justify-content: flex-start;
-      background: linear-gradient(180deg, color-mix(in srgb, var(--app-color) 3%, white) 0%, #f7f8fa 50%);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--app-color) 3%, white) 0%,
+        #f7f8fa 50%
+      );
     }
   }
 
@@ -249,11 +262,20 @@ $app-gradient-end: #6d3fde;
       position: absolute;
       inset: 0;
       pointer-events: none;
-      background-image: linear-gradient(color-mix(in srgb, var(--app-color) 8%, transparent) 1px, transparent 1px),
-        linear-gradient(90deg, color-mix(in srgb, var(--app-color) 8%, transparent) 1px, transparent 1px);
+      background-image:
+        linear-gradient(color-mix(in srgb, var(--app-color) 8%, transparent) 1px, transparent 1px),
+        linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--app-color) 8%, transparent) 1px,
+          transparent 1px
+        );
       background-size: 64px 64px;
       mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 70%);
-      -webkit-mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 70%);
+      -webkit-mask-image: radial-gradient(
+        ellipse at center,
+        rgba(0, 0, 0, 0.6) 0%,
+        rgba(0, 0, 0, 0) 70%
+      );
     }
   }
 
