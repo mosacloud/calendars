@@ -683,7 +683,7 @@ class Base(Configuration):
         {}, environ_name="OIDC_AUTH_REQUEST_EXTRA_PARAMS", environ_prefix=None
     )
     OIDC_RP_SCOPES = values.Value(
-        "openid email", environ_name="OIDC_RP_SCOPES", environ_prefix=None
+        "openid email profile", environ_name="OIDC_RP_SCOPES", environ_prefix=None
     )
     LOGIN_REDIRECT_URL = values.Value(
         None, environ_name="LOGIN_REDIRECT_URL", environ_prefix=None
@@ -724,9 +724,11 @@ class Base(Configuration):
         environ_prefix=None,
     )
 
-    # OIDC claims to store
+    # Claims persisted in User.claims. "picture" feeds User.picture and
+    # "locale" feeds User.language_confirmed_by_idp. Overriding this must keep
+    # both, or the avatar and the IdP language sync silently stop working.
     OIDC_STORE_CLAIMS = values.ListValue(
-        default=[],
+        default=["picture", "locale"],
         environ_name="OIDC_STORE_CLAIMS",
         environ_prefix=None,
     )
@@ -751,7 +753,7 @@ class Base(Configuration):
     )
 
     OIDC_USERINFO_FULLNAME_FIELDS = values.ListValue(
-        default=["first_name", "last_name"],
+        default=["first_name", "last_name", "given_name", "family_name"],
         environ_name="OIDC_USERINFO_FULLNAME_FIELDS",
         environ_prefix=None,
     )

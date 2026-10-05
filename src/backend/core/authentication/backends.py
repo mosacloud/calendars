@@ -9,6 +9,8 @@ from lasuite.oidc_login.backends import (
     OIDCAuthenticationBackend as LaSuiteOIDCAuthenticationBackend,
 )
 
+from core.authentication.language import compute_stored_language
+from core.authentication.profile import compute_full_name
 from core.entitlements import EntitlementsUnavailableError, get_user_entitlements
 from core.models import DuplicateEmailError, Organization
 
@@ -73,6 +75,10 @@ class OIDCAuthenticationBackend(LaSuiteOIDCAuthenticationBackend):
     in the User and Identity models, and handles signed and/or encrypted UserInfo response.
     """
 
+    def compute_full_name(self, user_info):
+        """Pick one given and one family name candidate (see ``profile``)."""
+        return compute_full_name(user_info, settings.OIDC_USERINFO_FULLNAME_FIELDS)
+
     def get_extra_claims(self, user_info):
         """Return extra claims from user_info.
 
@@ -90,6 +96,9 @@ class OIDCAuthenticationBackend(LaSuiteOIDCAuthenticationBackend):
         org_claim = settings.OIDC_USERINFO_ORGANIZATION_CLAIM
         if org_claim:
             extra[org_claim] = user_info.get(org_claim)
+        language = compute_stored_language(user_info)
+        if language:
+            extra["language"] = language
         return extra
 
     def get_existing_user(self, sub, email):
