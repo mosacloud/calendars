@@ -1,13 +1,33 @@
 import React, { PropsWithChildren, useCallback, useEffect, useState } from "react";
 
 import i18n from "@/features/i18n/initI18n";
+import { IS_LANGUAGE_FORCED, LANGUAGE_COOKIE, LANGUAGE_LOCAL_STORAGE } from "@/features/i18n/conf";
 import { fetchAPI } from "@/features/api/fetchApi";
 import { User } from "@/features/auth/types";
 import { baseApiUrl } from "../api/utils";
 import { APIError } from "../api/APIError";
 import { SpinnerPage } from "@/features/ui/components/spinner/SpinnerPage";
 
+// Clear the remembered language on logout: the key and cookie are shared by
+// everyone using this browser, and the IdP sync writes the signed-in user's
+// language into them. Each is cleared on its own, so one failing (private
+// mode, blocked storage) can't leave the other behind; neither may block the
+// sign-out itself.
+const forgetRememberedLanguage = () => {
+  try {
+    document.cookie = `${LANGUAGE_COOKIE}=; path=/; max-age=0`;
+  } catch (error) {
+    console.warn("Could not clear the remembered language cookie", error);
+  }
+  try {
+    localStorage.removeItem(LANGUAGE_LOCAL_STORAGE);
+  } catch (error) {
+    console.warn("Could not clear the remembered language from storage", error);
+  }
+};
+
 export const logout = () => {
+  forgetRememberedLanguage();
   window.location.replace(new URL("logout/", baseApiUrl()).href);
 };
 
@@ -52,9 +72,10 @@ export const Auth = ({ children, redirect }: PropsWithChildren & { redirect?: bo
     }
   }, [redirect]);
 
-  const refreshUser = async () => {
+  // Stable identity so consumers can list it in effect dependencies.
+  const refreshUser = useCallback(async () => {
     void init();
-  };
+  }, [init]);
 
   const shouldRedirectNoAccess = redirect && user?.can_access === false;
 
@@ -68,16 +89,18 @@ export const Auth = ({ children, redirect }: PropsWithChildren & { redirect?: bo
     }
   }, [shouldRedirectNoAccess]);
 
-  // Sync the logged-in user's saved language into i18next as soon as the user
-  // loads. The backend value is the source of truth (it's also used for email
-  // invitations). This must live in this always-mounted provider — not in the
-  // language picker, which only mounts when the user opens the menu — otherwise
-  // the UI stays on the browser-detected language until the menu is opened.
+  // Apply user.language only when the IdP confirmed it
+  // (language_confirmed_by_idp); otherwise keep the pre-login or
+  // browser-detected language. Skipped when the language is forced.
   useEffect(() => {
-    if (user?.language && i18n.language !== user.language) {
-      void i18n.changeLanguage(user.language);
+    if (IS_LANGUAGE_FORCED) return;
+    if (!user?.language_confirmed_by_idp || !user.language) return;
+    if (i18n.language !== user.language) {
+      i18n.changeLanguage(user.language).catch((error) => {
+        console.error("Error changing language", error);
+      });
     }
-  }, [user?.language]);
+  }, [user?.language, user?.language_confirmed_by_idp]);
 
   if (user === undefined || shouldRedirectNoAccess) {
     return <SpinnerPage />;

@@ -17,6 +17,8 @@ from django.db import models
 from encrypted_fields.fields import EncryptedJSONField
 from timezone_field import TimeZoneField
 
+from core.authentication.language import is_language_confirmed
+from core.authentication.profile import picture_from_claims
 from core.enums import (
     CHANNEL_SCOPE_COLLECTION_METHODS,
     CHANNEL_SCOPE_OBJECT_METHODS,
@@ -268,6 +270,21 @@ class User(AbstractBaseUser, BaseModel, auth_models.PermissionsMixin):
         if not self.email:
             raise ValueError("User has no email address.")
         mail.send_mail(subject, message, from_email, [self.email], **kwargs)
+
+    @property
+    def picture(self) -> str | None:
+        """Profile picture URL from the OIDC provider, if any."""
+        return picture_from_claims(self.claims)
+
+    @property
+    def language_confirmed_by_idp(self) -> bool:
+        """Whether ``language`` is the one the identity provider asserted.
+
+        ``language`` alone can't tell an IdP-synced value from one set through
+        the API, so the frontend only auto-applies it when this is True.
+        Requires "locale" to be listed in ``OIDC_STORE_CLAIMS``.
+        """
+        return is_language_confirmed(self.claims, self.language)
 
 
 def uuid_to_urlsafe(u):

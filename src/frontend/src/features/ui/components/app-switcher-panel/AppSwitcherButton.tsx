@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "@gouvfr-lasuite/cunningham-react";
+import { Button, type ButtonElement } from "@gouvfr-lasuite/cunningham-react";
 import { useConfig } from "@/features/config/ConfigProvider";
-import "./index.scss";
+import { useDismissablePopup } from "@/hooks/useDismissablePopup";
+import { usePopupPosition } from "@/hooks/usePopupPosition";
+import "./AppSwitcherButton.scss";
 
 type AppId = "epicentre" | "docs" | "drive" | "meet" | "mail" | "calendar" | "chat" | "commander";
 
@@ -105,6 +107,8 @@ const Panel = ({
       style={{
         background: `linear-gradient(180deg, color-mix(in srgb, ${APP_META.calendar.color} 8%, transparent) 0%, transparent 100%) top center / 100% 80px no-repeat, #ffffff`,
       }}
+      role="dialog"
+      aria-label={t("app_switcher.switch_app")}
     >
       <div className="app-switcher-panel__current">
         <AppIcon id="calendar" size={44} />
@@ -145,40 +149,31 @@ export const AppSwitcherButton = () => {
   const { config } = useConfig();
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  const [opensUpward, setOpensUpward] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<ButtonElement>(null);
 
   const appUrls = config.APP_URLS ?? {};
   const hasOtherApps = NAV_ORDER.some((id) => id in appUrls && id in APP_META);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [isOpen]);
+  const opensUpward =
+    usePopupPosition(ref, isOpen, (rect) => window.innerHeight - rect.bottom < 320) ?? false;
+
+  useDismissablePopup(ref, triggerRef, isOpen, setIsOpen);
 
   if (!hasOtherApps) return null;
 
   const handleOpen = () => {
-    if (ref.current) {
-      const rect = ref.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      setOpensUpward(spaceBelow < 320);
-    }
     setIsOpen((v) => !v);
   };
 
   return (
     <div ref={ref} className="app-switcher-panel">
       <Button
+        ref={triggerRef}
         color="brand"
         variant="tertiary"
         aria-label={t("app_switcher.switch_app")}
+        aria-haspopup="dialog"
         aria-expanded={isOpen}
         onClick={handleOpen}
         icon={
