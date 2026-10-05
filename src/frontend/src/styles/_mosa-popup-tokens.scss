@@ -1,0 +1,59 @@
+// Brand tokens and entry animation shared by the header popups (profile
+// dropdown, app switcher), plus the trigger button styling used by the
+// profile dropdown. Each component that `@use`s this partial emits its own
+// copy of `@keyframes mosa-panel-in`; the copies are identical, so that is
+// harmless.
+$mosa-surface: #ffffff;
+$mosa-bg: #f7f8fa;
+$mosa-border: #e6eaf1;
+$mosa-ink: #333333;
+$mosa-graphite: #5a6577;
+$mosa-shadow-elev:
+  0 2px 4px rgba(0, 0, 0, 0.02),
+  0 4px 8px rgba(0, 0, 0, 0.03),
+  0 8px 16px rgba(0, 0, 0, 0.04),
+  0 16px 32px rgba(0, 0, 0, 0.05),
+  0 32px 64px rgba(0, 0, 0, 0.08);
+$mosa-ease: cubic-bezier(0.4, 0, 0.2, 1);
+$mosa-brand: #0064c8;
+$mosa-brand-end: #0284c7;
+$mosa-gradient: linear-gradient(135deg, $mosa-brand-end, $mosa-brand);
+
+@keyframes mosa-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+// Our class names don't match mosa.css's `[class*='mosa-']` reduced-motion
+// rule, so collapse the popup motion ourselves.
+@mixin reduced-motion {
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    transition: none;
+  }
+}
+
+@mixin trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 150ms $mosa-ease;
+  @include reduced-motion;
+
+  &:hover {
+    background: $mosa-bg;
+  }
+}

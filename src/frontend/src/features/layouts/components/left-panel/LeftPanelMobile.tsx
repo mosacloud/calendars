@@ -1,9 +1,12 @@
+import { useAuth, logout } from "@/features/auth/Auth";
+import { LoginButton } from "@/features/auth/components/LoginButton";
 import { Gaufre } from "@/features/ui/components/gaufre/Gaufre";
-import { UserProfile } from "@/features/ui/components/user/UserProfile";
+import { ProfileDropdownButton } from "@/features/ui/components/profile-dropdown/ProfileDropdown";
 import { useResponsive } from "@gouvfr-lasuite/ui-kit";
 
 export const LeftPanelMobile = () => {
   const { isTablet } = useResponsive();
+  const { user } = useAuth();
 
   if (!isTablet) {
     return null;
@@ -13,7 +16,7 @@ export const LeftPanelMobile = () => {
     <div className="calendars__home__left-panel">
       <div className="calendars__home__left-panel__gaufre">
         <Gaufre />
-        <UserProfile />
+        {user ? <ProfileDropdownButton user={user} onLogout={logout} /> : <LoginButton />}
       </div>
     </div>
   );

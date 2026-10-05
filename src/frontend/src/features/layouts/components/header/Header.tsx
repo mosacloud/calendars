@@ -7,16 +7,17 @@ import {
 } from "@gouvfr-lasuite/ui-kit";
 import { GearRounded } from "@gouvfr-lasuite/ui-kit/icons";
 import { Button } from "@gouvfr-lasuite/cunningham-react";
-import { useAuth } from "@/features/auth/Auth";
+import { useAuth, logout } from "@/features/auth/Auth";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "@tanstack/react-router";
 import { fetchAPI } from "@/features/api/fetchApi";
 import { Feedback } from "@/features/feedback/Feedback";
+import { LoginButton } from "@/features/auth/components/LoginButton";
 import { Gaufre } from "@/features/ui/components/gaufre/Gaufre";
-import { AppSwitcherButton } from "@/features/ui/components/app-switcher-panel";
+import { AppSwitcherButton } from "@/features/ui/components/app-switcher-panel/AppSwitcherButton";
 import { DynamicCalendarLogo } from "@/features/ui/components/logo";
-import { UserProfile } from "@/features/ui/components/user/UserProfile";
+import { ProfileDropdownButton } from "@/features/ui/components/profile-dropdown/ProfileDropdown";
 import { FeatureFlag, useFeatureFlag } from "@/hooks/useFeatureFlag";
 
 export const HeaderIcon = () => {
@@ -105,6 +106,7 @@ const ApplicationMenu = () => {
 
 export const HeaderRight = () => {
   const { isTablet } = useResponsive();
+  const { user } = useAuth();
 
   return (
     <>
@@ -113,7 +115,7 @@ export const HeaderRight = () => {
           <ApplicationMenu />
           <AppSwitcherButton />
           <Gaufre />
-          <UserProfile />
+          {user ? <ProfileDropdownButton user={user} onLogout={logout} /> : <LoginButton />}
         </>
       )}
     </>

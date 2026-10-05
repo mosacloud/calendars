@@ -31,6 +31,9 @@
       "logout": "Logout",
       "login": "Login",
       "my_account": "My Account",
+      "profile": {
+        "openMenu": "Open profile menu for {{name}}"
+      },
       "settings": {
         "label": "Settings",
         "workingHours": {
@@ -771,6 +774,9 @@
       "logout": "Déconnexion",
       "login": "Connexion",
       "my_account": "Mon Compte",
+      "profile": {
+        "openMenu": "Ouvrir le menu de profil pour {{name}}"
+      },
       "settings": {
         "label": "Paramètres",
         "workingHours": {
@@ -1483,6 +1489,9 @@
       "logout": "Abmelden",
       "login": "Anmelden",
       "my_account": "Mein Konto",
+      "profile": {
+        "openMenu": "Profilmenü für {{name}} öffnen"
+      },
       "settings": {
         "label": "Einstellungen",
         "workingHours": {
@@ -2219,6 +2228,9 @@
       "logout": "Uitloggen",
       "login": "Inloggen",
       "my_account": "Mijn account",
+      "profile": {
+        "openMenu": "Profielmenu voor {{name}} openen"
+      },
       "settings": {
         "label": "Instellingen",
         "workingHours": {
