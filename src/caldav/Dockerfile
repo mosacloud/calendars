@@ -1,12 +1,18 @@
 # sabre/dav CalDAV Server
 # Based on Debian with Apache and PHP. Pinned to 8.5 to match the
 # scalingo-26 (Ubuntu 26.04) production stack, whose only PHP is 8.5.
-FROM php:8.5-apache-bookworm
+FROM php:8.5.12-apache-bookworm@sha256:747123a8d7d28c6f84960df94cc076a406314e4f9d556af0bcfddab81e33bd09
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# APT layer is intentionally time-dependent: bump this date to bust the
+# cache and pull the latest Debian security patches (base image and
+# Composer are digest-pinned for reproducibility).
+ENV MIN_UPDATE_DATE="2026-10-21"
+
 # Install dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
     libpq-dev \
     libonig-dev \
     postgresql-client \
@@ -21,8 +27,9 @@ RUN apt-get update && apt-get install -y \
 # invalid UTF-8 (or fatal).
 RUN docker-php-ext-install pdo pdo_pgsql mbstring
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Install Composer (keep in sync with the Makefile and
+# bin/scalingo_postfrontend)
+COPY --from=composer:2.10.3@sha256:af98f42dfff7c68ba8d53c2164fd9fde1087b7d449514baa38c418b1f6bc4bac /usr/bin/composer /usr/bin/composer
 
 # Create application directory
 WORKDIR /var/www/sabredav
@@ -59,7 +66,15 @@ RUN echo "log_errors = On" >> /usr/local/etc/php/conf.d/error-logging.ini \
     && echo "error_log = /proc/self/fd/2" >> /usr/local/etc/php/conf.d/error-logging.ini \
     && echo "display_errors = Off" >> /usr/local/etc/php/conf.d/error-logging.ini \
     && echo "display_startup_errors = Off" >> /usr/local/etc/php/conf.d/error-logging.ini \
-    && echo "memory_limit = 512M" >> /usr/local/etc/php/conf.d/error-logging.ini
+    && echo "memory_limit = 512M" >> /usr/local/etc/php/conf.d/error-logging.ini \
+    && echo "expose_php = Off" >> /usr/local/etc/php/conf.d/error-logging.ini
+
+# Don't advertise Apache/PHP versions in the Server header or on error
+# pages (SabreDAV's own version banner is already disabled via
+# $exposeVersion in server.php).
+RUN echo "ServerTokens Prod" >> /etc/apache2/conf-available/hardening.conf \
+    && echo "ServerSignature Off" >> /etc/apache2/conf-available/hardening.conf \
+    && a2enconf hardening
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/sabredav \
