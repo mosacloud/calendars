@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+from django.test import override_settings
+
 from core.services.translation_service import TranslationService
 
 
@@ -66,11 +68,19 @@ class TestNormalizeLang:  # pylint: disable=missing-function-docstring
     def test_normalize_simple(self):
         assert TranslationService.normalize_lang("fr") == "fr"
 
-    def test_normalize_unknown_falls_back_to_fr(self):
-        assert TranslationService.normalize_lang("es") == "fr"
+    def test_normalize_unknown_falls_back_to_default(self):
+        """Unknown codes fall back to the LANGUAGE_CODE-derived default."""
+        assert TranslationService.normalize_lang("es") == "en"
 
     def test_normalize_empty(self):
-        assert TranslationService.normalize_lang("") == "fr"
+        """Empty codes fall back to the LANGUAGE_CODE-derived default."""
+        assert TranslationService.normalize_lang("") == "en"
+
+    @override_settings(LANGUAGE_CODE="nl-nl")
+    def test_normalize_fallback_respects_language_code(self):
+        """The fallback follows the deployment's LANGUAGE_CODE setting."""
+        assert TranslationService.normalize_lang("es") == "nl"
+        assert TranslationService.normalize_lang("") == "nl"
 
 
 class TestFormatDate:
