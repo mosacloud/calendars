@@ -93,23 +93,12 @@ class TranslationService:
         return key
 
     @classmethod
-    def _default_language(cls) -> str:
-        """Deployment-default language, derived from Django settings.LANGUAGE_CODE
-        (e.g. ``"en-us"`` -> ``"en"``). Falls back to ``"en"`` if the setting is
-        missing or doesn't map to a supported language.
-        """
-        code = getattr(settings, "LANGUAGE_CODE", "en") or "en"
-        short = code.split("-")[0].lower()
-        return short if short in ("en", "fr", "de", "nl") else "en"
-
-    @classmethod
     def resolve_language(cls, request=None, email: Optional[str] = None) -> str:
         """Determine the best language for a request or email recipient.
 
         - From request: uses Django's get_language() (set by LocaleMiddleware).
         - From email: looks up User.language field.
-        - Fallback: ``settings.LANGUAGE_CODE`` (deployment-configurable),
-          ultimately ``"en"``.
+        - Fallback: "fr".
         """
         if request is not None:
             from django.utils.translation import (  # noqa: PLC0415  # pylint: disable=import-outside-toplevel
@@ -132,19 +121,18 @@ class TranslationService:
             except Exception:  # pylint: disable=broad-exception-caught
                 logger.exception("Failed to resolve language for recipient")
 
-        return cls._default_language()
+        return "fr"
 
     @classmethod
     def normalize_lang(cls, lang_code: str) -> str:
         """Normalize a language code to a simple 2-letter code.
 
         ``"fr-fr"`` -> ``"fr"``, ``"en-us"`` -> ``"en"``, ``"nl-nl"`` -> ``"nl"``.
-        Unknown / empty codes fall back to ``settings.LANGUAGE_CODE``.
         """
         if not lang_code:
-            return cls._default_language()
+            return "fr"
         short = lang_code.split("-")[0].lower()
-        return short if short in ("en", "fr", "de", "nl") else cls._default_language()
+        return short if short in ("en", "fr", "de", "nl") else "fr"
 
     @classmethod
     def format_date(cls, dt: datetime, lang: str) -> str:
