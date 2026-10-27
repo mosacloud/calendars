@@ -16,3 +16,4 @@ class CoreConfig(AppConfig):
         """
         # pylint: disable=import-outside-toplevel, unused-import
         from . import signals  # noqa: PLC0415
+        from .authentication import checks  # noqa: PLC0415
