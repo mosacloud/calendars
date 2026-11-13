@@ -1,9 +1,12 @@
 import { useTranslation } from "react-i18next";
-import { Button, Input, Switch } from "@gouvfr-lasuite/cunningham-react";
+import { Button, Input, Switch } from "@gouvfr-lasuite/ui-components";
 import { ScopeEditor } from "./ScopeEditor";
-import { Retry } from "@gouvfr-lasuite/ui-kit/icons";
+import { Retry } from "@gouvfr-lasuite/ui-components/icons";
 
 import type { ChannelScopeValue } from "../types";
+
+// Same limit as the `name` field of the channel API.
+const NAME_MAX_LENGTH = 255;
 
 type ChannelFormProps = {
   name: string;
@@ -41,6 +44,7 @@ export const ChannelForm = ({
         label={t("integrations.create.nameLabel")}
         value={name}
         onChange={(e) => onNameChange((e.target as HTMLInputElement).value)}
+        maxLength={NAME_MAX_LENGTH}
         fullWidth
         disabled={disabled}
       />

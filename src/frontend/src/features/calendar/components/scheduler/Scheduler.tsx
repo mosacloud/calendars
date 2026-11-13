@@ -13,6 +13,7 @@
  */
 
 import "@event-calendar/core/index.css";
+import "./ec-subgrid-fallback.scss";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileToolbar } from "./mobile/MobileToolbar";
@@ -22,18 +23,21 @@ import { MobileListView } from "./mobile/MobileListView";
 import { useCalendarContext } from "../../contexts/CalendarContext";
 import { useCalendarLocale } from "../../hooks/useCalendarLocale";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { DEFAULT_EVENT_COLOR } from "@/features/calendar/constants";
 import { EventModal } from "./EventModal";
 import { RecurringEditModal } from "./RecurringEditModal";
 import { SchedulerToolbar } from "./SchedulerToolbar";
 import { useSchedulerHandlers } from "./hooks/useSchedulerHandlers";
 import { useSchedulerInit, useSchedulingCapabilitiesCheck } from "./hooks/useSchedulerInit";
 import { useMobileNavigation } from "./hooks/useMobileNavigation";
+import { loadLastView, saveLastView } from "./utils/lastView";
 
 import type { CalDavCalendar } from "../../services/dav/types/caldav-service";
 import type { CalDavExtendedProps } from "../../services/dav/EventCalendarAdapter";
 import type { EventCalendarEvent } from "../../services/dav/types/event-calendar";
 
 import type { SchedulerProps, EventModalState, MobileListEvent } from "./types";
+import { getDefaultCalendar } from "@/features/calendar/utils/calendar-order";
 
 const BROWSER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -51,14 +55,14 @@ export const Scheduler = ({ defaultCalendarUrl }: SchedulerProps) => {
   } = useCalendarContext();
 
   const isMobile = useIsMobile();
-  const { firstDayOfWeek, intlLocale } = useCalendarLocale();
+  const { firstDayOfWeek, locale } = useCalendarLocale();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const calendarRef = contextCalendarRef;
   const [calendarUrl, setCalendarUrl] = useState(defaultCalendarUrl || "");
 
   // Toolbar state
-  const [currentView, setCurrentView] = useState("timeGridWeek");
+  const [currentView, setCurrentView] = useState(() => (isMobile ? "timeGridDay" : loadLastView()));
   const [viewTitle, setViewTitle] = useState("");
 
   // Modal state
@@ -85,11 +89,9 @@ export const Scheduler = ({ defaultCalendarUrl }: SchedulerProps) => {
 
   // Initialize calendar URL from context
   useEffect(() => {
-    if (orderedCalendars.length > 0 && !calendarUrl) {
-      // Default to the first calendar in the displayed order (top of the
-      // sidebar), not the raw server order.
-      const firstCalendar = orderedCalendars[0];
-      setCalendarUrl(defaultCalendarUrl || firstCalendar.url);
+    const defaultCalendar = getDefaultCalendar(orderedCalendars);
+    if (defaultCalendar && !calendarUrl) {
+      setCalendarUrl(defaultCalendarUrl || defaultCalendar.url);
     }
   }, [orderedCalendars, defaultCalendarUrl, calendarUrl]);
 
@@ -162,7 +164,8 @@ export const Scheduler = ({ defaultCalendarUrl }: SchedulerProps) => {
     adapter,
     visibleCalendarUrlsRef,
     davCalendarsRef,
-    initialView: isMobile ? "timeGridDay" : "timeGridWeek",
+    // Keep the current view when a locale change creates the calendar again.
+    initialView: currentView,
     currentDateRef,
     setCurrentDate: handleDatesSet,
     handleEventClick: handleEventClick as (info: unknown) => void,
@@ -195,8 +198,10 @@ export const Scheduler = ({ defaultCalendarUrl }: SchedulerProps) => {
     (view: string) => {
       calendarRef.current?.setOption("view", view);
       setCurrentView(view);
+      if (isMobile) return;
+      saveLastView(view);
     },
-    [calendarRef],
+    [calendarRef, isMobile],
   );
 
   // Auto-switch view when crossing mobile/desktop breakpoint
@@ -204,7 +209,7 @@ export const Scheduler = ({ defaultCalendarUrl }: SchedulerProps) => {
   useEffect(() => {
     if (prevIsMobileRef.current === isMobile) return;
     prevIsMobileRef.current = isMobile;
-    const targetView = isMobile ? "timeGridDay" : "timeGridWeek";
+    const targetView = isMobile ? "timeGridDay" : loadLastView();
     handleViewChange(targetView);
   }, [isMobile, handleViewChange]);
 
@@ -245,7 +250,7 @@ export const Scheduler = ({ defaultCalendarUrl }: SchedulerProps) => {
       start: new Date(e.start),
       end: e.end ? new Date(e.end) : new Date(e.start),
       allDay: e.allDay ?? false,
-      backgroundColor: e.backgroundColor || "#2563eb",
+      backgroundColor: e.backgroundColor || DEFAULT_EVENT_COLOR,
       extendedProps: e.extendedProps ?? {},
     }));
     setListEvents(parsed);
@@ -270,7 +275,7 @@ export const Scheduler = ({ defaultCalendarUrl }: SchedulerProps) => {
     const endDate = new Date(startDate);
     endDate.setHours(startDate.getHours() + 1);
 
-    const defaultUrl = calendarUrl || orderedCalendars[0]?.url || "";
+    const defaultUrl = calendarUrl || getDefaultCalendar(orderedCalendars)?.url || "";
 
     setModalState({
       isOpen: true,
@@ -333,7 +338,7 @@ export const Scheduler = ({ defaultCalendarUrl }: SchedulerProps) => {
             <WeekDayBar
               currentDate={currentDate}
               currentView={currentView}
-              intlLocale={intlLocale}
+              locale={locale}
               weekDays={weekDays}
               onDayClick={handleDayClick}
             />
@@ -352,7 +357,7 @@ export const Scheduler = ({ defaultCalendarUrl }: SchedulerProps) => {
         <MobileListView
           weekDays={weekDays}
           events={listEvents}
-          intlLocale={intlLocale}
+          locale={locale}
           onEventClick={handleMobileEventClick}
         />
       )}

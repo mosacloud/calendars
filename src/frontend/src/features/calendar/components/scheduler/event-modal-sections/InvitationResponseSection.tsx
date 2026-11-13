@@ -1,8 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { Button } from "@gouvfr-lasuite/cunningham-react";
+import { Button, Icon, IconType } from "@gouvfr-lasuite/ui-components";
 import { SectionRow } from "./SectionRow";
-import { Checkmark, QuestionMark, XMark } from "@gouvfr-lasuite/ui-kit/icons";
-import { Icon, IconType } from "@gouvfr-lasuite/ui-kit";
+import { Checkmark, QuestionMark, XMark } from "@gouvfr-lasuite/ui-components/icons";
 import { getBadgeType, getPartstatIcon } from "../partstatBadge";
 
 import type { IcsOrganizer } from "ts-ics";
@@ -99,7 +98,7 @@ export const InvitationResponseSection = ({
             >
               {partstatIcon}
               <span>
-                {t("calendar.event.yourResponse")}:{" "}
+                {t("calendar.event.yourResponse")}{" "}
                 <strong>{t(statusLabelKey(currentStatus))}</strong>
               </span>
             </div>

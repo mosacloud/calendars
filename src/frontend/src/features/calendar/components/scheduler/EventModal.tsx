@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button, Input, Modal, ModalSize } from "@gouvfr-lasuite/cunningham-react";
+import { Button, Input, Modal, ModalSize, Icon, IconType } from "@gouvfr-lasuite/ui-components";
 import { CalendarSelect } from "./CalendarSelect";
 import { useAuth } from "@/features/auth/Auth";
 import { addToast, ToasterItem } from "@/features/ui/components/toaster/Toaster";
@@ -23,12 +23,12 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useConfig } from "@/features/config/ConfigProvider";
 import { FeatureFlag, useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { SectionRow } from "./event-modal-sections/SectionRow";
-import { Icon, IconType } from "@gouvfr-lasuite/ui-kit";
-import { Meet, Pin, Calendar, Edit, Lock } from "@gouvfr-lasuite/ui-kit/icons";
+import { Meet, Pin, Calendar, Edit, Lock } from "@gouvfr-lasuite/ui-components/icons";
 
 import type { IcsEvent, IcsOrganizer } from "ts-ics";
 
 import type { EventModalProps, RecurringDeleteOption, RecurringEditOption } from "./types";
+import { getDefaultCalendar } from "@/features/calendar/utils/calendar-order";
 
 export const EventModal = ({
   isOpen,
@@ -109,13 +109,13 @@ export const EventModal = ({
   // not pass one (e.g. "new event" from a context with no default
   // calendar). When `calendarUrl` is non-empty we trust it, even if
   // it isn't in `calendars` yet — the list may still be loading and
-  // auto-snapping to calendars[0] here would stomp the correct choice.
+  // auto-snapping to a default here would stomp the correct choice.
   useEffect(() => {
     if (!isOpen || calendars.length === 0) return;
     if (calendarUrl) return;
     const currentIsValid = calendars.some((cal) => cal.url === form.selectedCalendarUrl);
     if (!currentIsValid) {
-      form.setSelectedCalendarUrl(calendars[0].url);
+      form.setSelectedCalendarUrl(getDefaultCalendar(calendars)!.url);
     }
     // Depend on the specific form fields used inside this effect rather
     // than the whole ``form`` object — useEventForm returns a new object
@@ -232,7 +232,7 @@ export const EventModal = ({
     if (!onRespondToInvitation || !event) return;
     setIsLoading(true);
     try {
-      await onRespondToInvitation(event as IcsEvent, status, option);
+      if (!(await onRespondToInvitation(event as IcsEvent, status, option))) return;
       form.setAttendees((prev) =>
         prev.map((att) =>
           user?.email && att.email.toLowerCase() === user.email.toLowerCase()
@@ -240,9 +240,6 @@ export const EventModal = ({
             : att,
         ),
       );
-    } catch (error) {
-      // Toast is shown by the parent handler; just stop the spinner.
-      console.error("Failed to respond to invitation:", error);
     } finally {
       setIsLoading(false);
     }

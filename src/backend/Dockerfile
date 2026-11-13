@@ -1,11 +1,14 @@
 # Django calendars
 
 # ---- base image to inherit from ----
-FROM python:3.13.9-alpine AS base
+FROM python:3.14.10-alpine@sha256:a18b20ad69e74df6cf6d2e1b1a260d7a1ecf5380fd83b310f83ba88c461cf894 AS base
 
 # Upgrade pip to its latest release to speed up dependencies installation
 # We must do taht to avoid having an outdated pip version with security issues
 RUN python -m pip install --upgrade pip setuptools
+
+# Bump to force an apk refresh + security upgrade of the base OS.
+ENV MIN_UPDATE_DATE="2026-11-12"
 
 # Upgrade system packages to install security updates
 RUN apk update && \
@@ -24,7 +27,7 @@ ENV UV_LINK_MODE=copy
 ENV UV_PYTHON_DOWNLOADS=0
 
 # install uv
-COPY --from=ghcr.io/astral-sh/uv:0.9.10 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.13.4@sha256:9f130421e930bfbdc563c00740466603f8723158e90297d07957c2294640262b /uv /uvx /bin/
 
 WORKDIR /app
 
@@ -111,7 +114,7 @@ USER root:root
 RUN apk add postgresql-client
 
 # Install uv for development dependencies
-COPY --from=ghcr.io/astral-sh/uv:0.9.10 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.13.4@sha256:9f130421e930bfbdc563c00740466603f8723158e90297d07957c2294640262b /uv /uvx /bin/
 
 # Install development dependencies (ensure venv is created and used)
 RUN uv sync --all-extras --locked

@@ -24,7 +24,7 @@ BLUE := \033[1;34m
 DOCKER_UID          = $(shell id -u)
 DOCKER_GID          = $(shell id -g)
 DOCKER_USER         = $(DOCKER_UID):$(DOCKER_GID)
-COMPOSE             = DOCKER_USER=$(DOCKER_USER) docker compose
+COMPOSE             = DOCKER_USER=$(DOCKER_USER) DOCKER_UID=$(DOCKER_UID) docker compose
 COMPOSE_EXEC        = $(COMPOSE) exec
 COMPOSE_EXEC_APP    = $(COMPOSE_EXEC) backend-dev
 COMPOSE_RUN         = $(COMPOSE) run --rm
@@ -35,6 +35,8 @@ COMPOSE_RUN_APP_NO_DEPS = $(COMPOSE_RUN) --no-deps backend-dev
 MANAGE              = $(COMPOSE_RUN_APP) python manage.py
 MANAGE_EXEC         = $(COMPOSE_EXEC_APP) python manage.py
 PSQL_E2E            = ./bin/postgres_e2e
+# Keep in sync with src/caldav/Dockerfile and bin/scalingo_postfrontend
+COMPOSER_IMAGE      = composer:2.10.3@sha256:2cf275428757e5435a667bfc0d038b14520ca02be2b1b70d44a05c8c19e2de48
 
 # ==============================================================================
 # RULES
@@ -132,7 +134,7 @@ restart: \
 
 caldav-lock: ## regenerate src/caldav/composer.lock
 	@echo "$(BOLD)Regenerating composer.lock$(RESET)"
-	@docker run --rm -v $(PWD)/src/caldav:/app -w /app composer:2.9.5 composer update --no-install --no-interaction --ignore-platform-reqs
+	@docker run --rm -v $(PWD)/src/caldav:/app -w /app $(COMPOSER_IMAGE) composer update --no-install --no-scripts --no-interaction --ignore-platform-reqs
 .PHONY: caldav-lock
 
 migrate-caldav: ## Initialize CalDAV server database schema
@@ -169,19 +171,19 @@ analyze-back: ## lint all back-end python sources with pylint
 .PHONY: analyze-back
 
 lint-front: ## format then run the frontend linter (oxfmt + oxlint)
-	@$(COMPOSE) run --rm frontend-dev sh -c "pnpm run format && pnpm run lint"
+	@$(COMPOSE) run --rm frontend-dev sh -c "npm run format && npm run lint"
 .PHONY: lint-front
 
 format-front: ## format front-end sources with oxfmt
-	@$(COMPOSE) run --rm frontend-dev sh -c "pnpm run format"
+	@$(COMPOSE) run --rm frontend-dev sh -c "npm run format"
 .PHONY: format-front
 
 typecheck-front: ## run the frontend type checker
-	@$(COMPOSE) run --rm frontend-dev sh -c "pnpm run ts:check"
+	@$(COMPOSE) run --rm frontend-dev sh -c "npm run ts:check"
 .PHONY: typecheck-front
 
 analyze-front: ## analyze frontend bundle sizes (per-chunk + per-package breakdown)
-	@$(COMPOSE) run --rm frontend-dev sh -c "pnpm run analyze"
+	@$(COMPOSE) run --rm frontend-dev sh -c "npm run analyze"
 .PHONY: analyze-front
 
 # -- Tests
@@ -205,7 +207,7 @@ test-back-parallel: ## run all back-end tests in parallel
 
 test-front: ## run the frontend tests
 	@args="$(filter-out $@,$(MAKECMDGOALS))" && \
-	$(COMPOSE) run --rm frontend-dev sh -c "pnpm test -- $${args:-${1}}"
+	$(COMPOSE) run --rm frontend-dev sh -c "npm test -- $${args:-${1}}"
 .PHONY: test-front
 
 # -- E2E Tests
@@ -270,7 +272,7 @@ shell-back-django: ## connect to django shell
 
 back-lock: ## regenerate the uv.lock file
 	@echo "$(BOLD)Regenerating uv.lock$(RESET)"
-	@docker run --rm -v $(PWD)/src/backend:/app -w /app ghcr.io/astral-sh/uv:python3.13-alpine uv lock
+	@docker run --rm -v $(PWD)/src/backend:/app -w /app ghcr.io/astral-sh/uv:0.13.4-python3.14-alpine@sha256:0cb69bb18ffcd57db04f045010b0234132a111da70dde5a393d26ad288d38e13 uv lock
 .PHONY: back-lock
 
 # -- Database
@@ -294,14 +296,21 @@ demo: ## flush db then create a demo
 
 # -- Frontend
 
-install-front: ## install frontend deps and (re)generate pnpm-lock.yaml
-	@$(COMPOSE) run --rm -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 node \
-		sh -c "cd /app/src/frontend && corepack pnpm install"
+build-front-distroless: ## build the frontend distroless production image (Caddy + static bundle)
+	@docker build --target frontend-production -t calendars-frontend-distroless src/frontend/
+.PHONY: build-front-distroless
+
+test-front-distroless: build-front-distroless ## build and smoke-test the frontend distroless production image
+	@bin/smoke-test-front calendars-frontend-distroless
+.PHONY: test-front-distroless
+
+install-front: ## install frontend deps (freezes the lockfile, then runs the dependency guardrail)
+	@$(COMPOSE) run --rm node sh -c "cd /app/src/frontend && npm install"
+	@$(COMPOSE) run --rm node sh -c "cd /app/src/frontend && npm run check:deps"
 .PHONY: install-front
 
 install-frozen-front: ## install frontend deps strictly from the committed lockfile
-	@$(COMPOSE) run --rm -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 node \
-		sh -c "cd /app/src/frontend && corepack pnpm install --frozen-lockfile"
+	@$(COMPOSE) run --rm node sh -c "cd /app/src/frontend && npm ci"
 .PHONY: install-frozen-front
 
 # -- Release

@@ -2,9 +2,9 @@
  * Custom event content renderer for the scheduler.
  *
  * Adapts event display based on duration:
- *  - 15–30 min  → single line: "Title, HH:MM"
- *  - 45–60 min  → two lines: title  /  time + location
- *  - 75 min+    → title (up to 2 lines)  /  time + location
+ *  - up to 30 min → single line: "Title, HH:MM"
+ *  - 31 to 60 min → two lines: title  /  "HH:MM – HH:MM" + location
+ *  - over 60 min  → title (up to 2 lines)  /  "HH:MM – HH:MM" + location
  */
 
 import type { CalDavExtendedProps } from "../../../services/dav/EventCalendarAdapter";
@@ -21,14 +21,22 @@ export interface EventContentInfo {
 }
 
 const esc = (s: string): string =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
 const fmtTime = (d: Date): string =>
   `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
-export const createEventContent = (info: EventContentInfo): EventCalendarContent => {
+export const createEventContent = (
+  info: EventContentInfo,
+  noTitle: string,
+): EventCalendarContent => {
   const { event } = info;
-  const title = typeof event.title === "string" ? event.title : "";
+  const title = (typeof event.title === "string" && event.title) || noTitle;
 
   // All-day events: just show the title
   if (event.allDay) {
@@ -50,7 +58,7 @@ export const createEventContent = (info: EventContentInfo): EventCalendarContent
   const location = cleaned.location;
   const time = fmtTime(start);
 
-  // ≤ 30 min — single line: "Title, HH:MM"
+  // Up to 30 min: single line "Title, HH:MM"
   if (durationMin <= 30) {
     return {
       html:
@@ -62,9 +70,10 @@ export const createEventContent = (info: EventContentInfo): EventCalendarContent
     };
   }
 
-  const details = location ? `${time}, ${location}` : time;
+  const timeRange = `${time} – ${fmtTime(end)}`;
+  const details = location ? `${timeRange}, ${location}` : timeRange;
 
-  // 45–60 min — two single lines
+  // 31 to 60 min: two single lines
   if (durationMin <= 60) {
     return {
       html:
@@ -75,7 +84,7 @@ export const createEventContent = (info: EventContentInfo): EventCalendarContent
     };
   }
 
-  // 75 min+ — title wraps up to 2 lines, then details
+  // Over 60 min: title wraps up to 2 lines, then details
   return {
     html:
       `<div class="ec-custom ec-custom--large">` +

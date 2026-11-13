@@ -1,6 +1,7 @@
 export interface ApiConfig {
   FRONTEND_THEME?: string;
   APP_URLS?: Record<string, string>;
+  FRONTEND_SILENT_LOGIN_ENABLED?: boolean;
   FRONTEND_LAGAUFRE_ENABLED?: boolean;
   FRONTEND_LAGAUFRE_WIDGET_PATH?: string;
   FRONTEND_LAGAUFRE_WIDGET_API_URL?: string;
@@ -19,6 +20,8 @@ export interface ApiConfig {
   FEATURE_EVENT_SCHEDULING?: boolean;
   FEATURE_MESSAGES_INTEGRATION?: boolean;
   CALENDAR_INVITATION_FROM_EMAIL?: string | null;
+  /** The configured languages, as [code, display name] pairs. */
+  LANGUAGES?: [string, string][];
   theme_customization?: ThemeCustomization;
 }
 

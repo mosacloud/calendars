@@ -4,6 +4,7 @@
  * Factorized utilities for XML building, DAV requests, and error handling.
  */
 
+import { ShareAccess } from "./types/caldav-service";
 import type { SharePrivilege, CalDavResponse } from "./types/caldav-service";
 
 /** XML namespace prefix lookup used when building prop keys in PROPFIND
@@ -130,6 +131,17 @@ export function buildMkCalendarXml(props: CalendarProps): string {
 </C:mkcalendar>`;
 }
 
+/** Build the PROPPATCH body that sets or removes `LS:calendar-hidden`. */
+export function buildHiddenProppatchXml(hidden: boolean): string {
+  const update = hidden
+    ? "<D:set><D:prop><LS:calendar-hidden>true</LS:calendar-hidden></D:prop></D:set>"
+    : "<D:remove><D:prop><LS:calendar-hidden/></D:prop></D:remove>";
+  return `<?xml version="1.0" encoding="utf-8"?>
+<D:propertyupdate ${XML_NS.DAV} ${XML_NS.LS}>
+  ${update}
+</D:propertyupdate>`;
+}
+
 /** Build PROPPATCH request body */
 export function buildProppatchXml(props: CalendarProps): string {
   const propsXml = buildCalendarPropsXml(props);
@@ -193,6 +205,15 @@ export function parseSharePrivilege(access: unknown, shareAccess?: string): Shar
   const accessObj = access as Record<string, unknown>;
   if (accessObj["read-write"] || accessObj["readWrite"]) return "read-write";
   return "read";
+}
+
+/**
+ * Tells if a ``{DAV:}share-access`` value gives read access only.
+ * A free/busy share has read access at this level.
+ * It returns false for a missing or unknown value.
+ */
+export function isReadOnlyShareAccess(shareAccess: unknown): boolean {
+  return typeof shareAccess === "object" && shareAccess !== null && ShareAccess.READ in shareAccess;
 }
 
 export type ShareeXmlParams = {
@@ -263,19 +284,33 @@ function toCalDavTime(value: Date | string): string {
 }
 
 type CalendarQueryParams = {
-  /** When provided, results are filtered to events overlapping this range. */
+  /**
+   * Sets the range of `expand`. If there is no `uid`, the server also
+   * returns only the events that overlap this range.
+   */
   timeRange?: { start: Date | string; end: Date | string };
   /**
    * When true, the server expands recurring events into individual
    * occurrences within `timeRange` (RFC 4791 §9.6.5). Requires `timeRange`.
    */
   expand?: boolean;
+  /**
+   * When provided, the server returns only events whose UID contains this
+   * value. CalDAV text-match is a substring match, so callers check the
+   * exact UID. SabreDAV ignores this filter next to a time-range filter,
+   * so the UID filter replaces it. `expand` still uses `timeRange`.
+   */
+  uid?: string;
 };
 
 /** Build a calendar-query REPORT body that fetches `getetag` + `calendar-data`. */
 export function buildCalendarQueryXml(params: CalendarQueryParams = {}): string {
-  const timeRangeFilter = params.timeRange
-    ? `<C:time-range start="${toCalDavTime(params.timeRange.start)}" end="${toCalDavTime(params.timeRange.end)}"/>`
+  const timeRangeFilter =
+    params.timeRange && !params.uid
+      ? `<C:time-range start="${toCalDavTime(params.timeRange.start)}" end="${toCalDavTime(params.timeRange.end)}"/>`
+      : "";
+  const uidFilter = params.uid
+    ? `<C:prop-filter name="UID"><C:text-match collation="i;octet">${escapeXml(params.uid)}</C:text-match></C:prop-filter>`
     : "";
 
   const calendarData =
@@ -293,6 +328,7 @@ export function buildCalendarQueryXml(params: CalendarQueryParams = {}): string 
     <C:comp-filter name="VCALENDAR">
       <C:comp-filter name="VEVENT">
         ${timeRangeFilter}
+        ${uidFilter}
       </C:comp-filter>
     </C:comp-filter>
   </C:filter>
@@ -311,6 +347,12 @@ export function buildCalendarQueryXml(params: CalendarQueryParams = {}): string 
  * levels are not expressible via the standard CalendarServer access
  * tokens — ``parseSharePrivilege`` needs the override map to round-trip
  * those levels correctly.
+ *
+ * ``LS:calendar-sync-managed`` marks a calendar instance that the
+ * mailbox ACL sync manages.
+ *
+ * ``LS:calendar-hidden`` marks a calendar that the user hid (see
+ * ``CalDavCalendar.hidden``).
  */
 export const CALENDAR_PROPS = {
   [`${NS.CALDAV}:calendar-description`]: {},
@@ -324,8 +366,11 @@ export const CALENDAR_PROPS = {
   [`${NS.DAV}:sync-token`]: {},
   [`${NS.CALDAV}:schedule-calendar-transp`]: {},
   [`${NS.CALENDAR_SERVER}:invite`]: {},
+  [`${NS.DAV}:share-access`]: {},
   "LS:calendar-owner-type": {},
   "LS:share-access-map": {},
+  "LS:calendar-sync-managed": {},
+  "LS:calendar-hidden": {},
 } as const;
 
 // ============================================================================

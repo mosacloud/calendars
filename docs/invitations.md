@@ -13,9 +13,9 @@ Frontend (EventModal)
         → CalendarInvitationService (sends email)
           → Attendee receives email
             → RSVP link or iTIP client response
-              → RSVPView (Django) or CalDAV REPLY
+              → RSVPConfirmView (Django) or CalDAV REPLY
                 → PARTSTAT updated in event
-                  → Organizer notified
+                  → Organizer notified (CalDAV REPLY path only)
 ```
 
 ## Creating an event with attendees
@@ -87,12 +87,12 @@ Steps:
    | REPLY | any | `calendar_invitation_reply.html` |
 3. **RSVP tokens** — for REQUEST emails, generates signed URLs:
    ```
-   /rsvp/?token=<signed>&action=accepted
-   /rsvp/?token=<signed>&action=tentative
-   /rsvp/?token=<signed>&action=declined
+   {APP_URL}/rsvp/?t=<signed>
    ```
-   Tokens are signed with `django.core.signing.Signer(salt="rsvp")`
-   and contain `{uid, email, organizer}`.
+   The email has one link per action (accepted, tentative, declined).
+   `django.core.signing.TimestampSigner(salt="rsvp")` signs the token.
+   The token contains
+   `{u: uid, e: email, o: organizer, g: org id, a: action}`.
 4. **ICS attachment** — if `CALENDAR_ITIP_ENABLED=True`, the
    attachment includes `METHOD:REQUEST` for iTIP-aware clients
    (Outlook, Apple Mail). If False (default), the METHOD is stripped
@@ -108,18 +108,19 @@ Two paths:
 
 Attendee clicks Accept / Maybe / Decline link in the email.
 
-`RSVPView` handles `GET /rsvp/?token=...&action=accepted`:
+`RSVPConfirmView` handles `/rsvp/`:
 
-1. Unsigns the token (salt="rsvp")
-2. Finds the event in the organizer's CalDAV calendar by UID
-3. Checks the event is not in the past (recurring events are never
-   considered past)
-4. Updates the attendee's `PARTSTAT` to ACCEPTED / TENTATIVE / DECLINED
-5. PUTs the updated event back to CalDAV
-6. Renders a confirmation page
+1. `GET /rsvp/?t=...` renders a page that sends the POST with
+   JavaScript. Without JavaScript, the page shows a submit button.
+   GET-only previewers do not submit an RSVP.
+2. `POST /rsvp/` checks the token signature (salt="rsvp")
+3. The view calls `POST /internal-api/rsvp/` on SabreDAV. SabreDAV
+   sets the attendee's `PARTSTAT` to ACCEPTED, TENTATIVE or DECLINED
+4. The view renders a confirmation page
 
-The PUT triggers SabreDAV to generate a REPLY message, which flows
-back through HttpCallbackIMipPlugin → Django → organizer email.
+The internal API writes the event directly to the CalDAV backend.
+SabreDAV scheduling does not run. As a result, SabreDAV sends no
+REPLY and the organizer gets no email.
 
 ### iTIP client response
 
@@ -156,7 +157,9 @@ When an event with attendees is deleted:
 | `CALDAV_CALLBACK_BASE_URL` | **required** | Base URL for CalDAV→Django callbacks (e.g. `http://backend:8000`). Set on the CalDAV container. |
 | `CALENDAR_ITIP_ENABLED` | False | Use iTIP METHOD headers in ICS attachments |
 | `CALENDAR_INVITATION_FROM_EMAIL` | `DEFAULT_FROM_EMAIL` | Sender address for invitation emails |
-| `APP_URL` | `""` | Base URL for RSVP links in emails |
+| `APP_URL` | `""` | Public URL of the backend. Required: the RSVP links and the images in emails are built from it |
+| `EMAIL_LOGO_IMG` | `None` | URL of the logo in emails. Empty: the Calendriers logo from `APP_URL/static/images/` |
+| `EMAIL_FOOTER_IMG` | `None` | URL of the footer image in emails, shown 160px wide. Empty: no footer |
 
 ## Key files
 
@@ -171,6 +174,7 @@ When an event with attendees is deleted:
 | Email service | `src/backend/core/services/calendar_invitation_service.py` |
 | ICS parser | `src/backend/core/services/calendar_invitation_service.py` (`ICalendarParser`) |
 | Email templates | `src/backend/core/templates/emails/calendar_invitation*.html` |
+| Email images | `src/backend/core/static/images/` (served from `APP_URL/static/images/`) |
 | SabreDAV sanitizer | `src/caldav/src/CalendarSanitizerPlugin.php` |
 | SabreDAV attendee dedup | `src/caldav/src/AttendeeNormalizerPlugin.php` |
 | SabreDAV callback plugin | `src/caldav/src/HttpCallbackIMipPlugin.php` |

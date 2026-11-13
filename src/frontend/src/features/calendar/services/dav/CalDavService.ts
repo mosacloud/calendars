@@ -32,11 +32,12 @@ import type {
   CalDavResponse,
   FreeBusyRequest,
   FreeBusyResponse,
-  SchedulingResponse,
-  CalDavAttendee,
+  InvitationOutcome,
+  InvitationResponse,
 } from "./types/caldav-service";
 
 import {
+  buildHiddenProppatchXml,
   buildProppatchXml,
   buildShareRequestXml,
   buildUnshareRequestXml,
@@ -47,16 +48,29 @@ import {
   NS,
   parseCalendarComponents,
   parseInviteSharees,
+  isReadOnlyShareAccess,
   parseInviteOrganizerEmail,
   parseCalendarOrder,
   getCalendarUrlFromEventUrl,
   asResult,
+  DavCallError,
   davFailure,
   type ShareeXmlParams,
   type CalendarProps,
 } from "./caldav-helpers";
 import { getIcalTimezoneBlock } from "./helpers/ical-timezones";
+import {
+  buildOccurrenceReply,
+  findRsvpBlocker,
+  resolveRsvpEvent,
+  seriesTargets,
+  toSeriesWallClock,
+  withPartstat,
+} from "./helpers/rsvp";
+import { isKnownTimezone, toWallClock } from "./helpers/timezone";
 import { buildFreeBusyRequestIcs } from "./helpers/freebusy-builder";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Resolve an ICS date to its authoritative wall-clock instant. When a
  * TZID is present `local.date` is the wall-clock value; otherwise fall
@@ -178,6 +192,8 @@ export class CalDavService {
         method: "PROPFIND",
         props: CALENDAR_PROPS,
         depth: "1",
+        // The server leaves hidden calendars out of the listing without this header.
+        headers: { "X-LS-Include-Hidden": "true" },
       });
       if (!result.success || !result.responses) {
         throw new Error(result.error ?? "Failed to fetch calendars");
@@ -233,6 +249,9 @@ export class CalDavService {
       (props as Record<string, unknown> | undefined)?.["share-access-map"];
     const sharees = parseInviteSharees(rawInvite, rawAccessMap);
     const mailboxEmail = ownerType === "MAILBOX" ? parseInviteOrganizerEmail(rawInvite) : undefined;
+    const syncManaged = props?.calendarSyncManaged === "true";
+    const hidden = props?.calendarHidden === "true";
+    const readOnly = isReadOnlyShareAccess(props?.shareAccess);
 
     const displayname = (props as Record<string, unknown> | undefined)?.displayname;
     const displayName =
@@ -251,6 +270,9 @@ export class CalDavService {
       includeInAvailability: !isTransparent,
       ownerType,
       mailboxEmail,
+      syncManaged,
+      hidden,
+      readOnly,
       sharees,
       ctag: (props as Record<string, string | undefined> | undefined)?.getctag,
       syncToken: (props as Record<string, string | undefined> | undefined)?.syncToken,
@@ -357,6 +379,23 @@ export class CalDavService {
     }
 
     return this.fetchCalendar(calendarUrl);
+  }
+
+  /**
+   * Hides the calendar for the user, or shows it again. It sets or removes
+   * ``LS:calendar-hidden`` on the user's instance (see ``CalDavCalendar.hidden``).
+   */
+  async setCalendarHidden(calendarUrl: string, hidden: boolean): Promise<CalDavResponse> {
+    const result = await davRequest({
+      url: calendarUrl,
+      method: "PROPPATCH",
+      body: buildHiddenProppatchXml(hidden),
+    });
+    // A refused property comes back in a 207 response with an error status.
+    if (!result.success || result.responses?.some((r) => !r.ok)) {
+      return { success: false, error: result.error, status: result.status };
+    }
+    return { success: true };
   }
 
   async deleteCalendar(calendarUrl: string): Promise<CalDavResponse> {
@@ -758,11 +797,20 @@ export class CalDavService {
   }
 
   /**
-   * Create an override instance for a recurring event.
+   * Create or replace the override of one occurrence of a recurring event.
    *
-   * This adds the modified occurrence as a new VEVENT with RECURRENCE-ID
-   * inside the same ICS resource, and adds an EXDATE to the parent event
-   * to exclude the original occurrence.
+   * The RECURRENCE-ID of the override identifies the occurrence that it
+   * replaces. The method does not add an EXDATE to the master: SabreDAV
+   * reads a new EXDATE from an attendee as a decline of the occurrence.
+   * The method keeps the EXDATEs that the master already has.
+   *
+   * `occurrenceDate` identifies the original occurrence, also when the
+   * override moves it. The UTC fields of the date hold the wall-clock
+   * time in the timezone of the series ("fake UTC").
+   *
+   * Limitation: the method compares wall-clock times. In the hour that
+   * repeats when DST ends, two occurrences can have the same wall-clock
+   * time. The method cannot tell them apart, so they share one override.
    */
   async createOverrideInstance(
     eventUrl: string,
@@ -792,9 +840,6 @@ export class CalDavService {
         throw new Error("Source event not found in ICS data");
       }
 
-      // occurrenceDate is already in "fake UTC" format (UTC components = local timezone
-      // time), since it comes from adapter.toIcsEvent() which creates fake UTC dates.
-      // Use it directly with the source event's timezone info.
       const occurrenceFakeUtc = occurrenceDate;
       let occurrenceLocal: { date: Date; timezone: string; tzoffset: string } | undefined;
 
@@ -806,21 +851,26 @@ export class CalDavService {
         };
       }
 
-      // Check if an override for this occurrence already exists (re-drag case)
-      // occurrenceFakeUtc is in fake UTC format. Compare against both:
-      // - recurrenceId.value.date (real UTC from ts-ics parsing)
-      // - recurrenceId.value.local?.date (fake UTC if TZID was present)
+      // Find the existing override of this occurrence. Its RECURRENCE-ID can
+      // be in UTC or in another timezone. Thus compare it as wall-clock time
+      // in the timezone of the series, like occurrenceFakeUtc. A date, or a
+      // series without timezone, compares as is.
+      const timezone = occurrenceLocal?.timezone;
+      const toSeriesTime = (value: IcsDateObject): Date => {
+        if (!timezone || value.type === "DATE") return value.date;
+        if (value.local?.timezone === timezone) return value.local.date;
+        return toWallClock(value.date, timezone);
+      };
       const existingOverrideIdx =
         calendar.events?.findIndex(
           (e) =>
             e.uid === overrideEvent.uid &&
             e.recurrenceId &&
-            (e.recurrenceId.value.date.getTime() === occurrenceFakeUtc.getTime() ||
-              e.recurrenceId.value.local?.date.getTime() === occurrenceFakeUtc.getTime()),
+            toSeriesTime(e.recurrenceId.value).getTime() === occurrenceFakeUtc.getTime(),
         ) ?? -1;
 
       if (existingOverrideIdx >= 0) {
-        // Re-drag: update existing override in-place, EXDATE already exists
+        // Replace the existing override. Keep its RECURRENCE-ID.
         const existingOverride = calendar.events![existingOverrideIdx];
         calendar.events![existingOverrideIdx] = {
           ...overrideEvent,
@@ -829,15 +879,6 @@ export class CalDavService {
           sequence: (existingOverride.sequence ?? 0) + 1,
         };
       } else {
-        // First override: add EXDATE + new override VEVENT
-        const newExdate: IcsDateObject = {
-          date: occurrenceFakeUtc,
-          type: sourceEvent.start.type,
-          local: occurrenceLocal,
-        };
-
-        sourceEvent.exceptionDates = [...(sourceEvent.exceptionDates ?? []), newExdate];
-
         const overrideVevent: IcsEvent = {
           ...overrideEvent,
           recurrenceRule: undefined,
@@ -875,6 +916,40 @@ export class CalDavService {
     }, "Failed to create override instance");
   }
 
+  /**
+   * Get the occurrence dates of an event in a time range. The server
+   * expands the RRULE and removes the EXDATEs. Each date is the
+   * RECURRENCE-ID of an occurrence, or the start of a non-recurring event.
+   * A timed date is an instant. An all-day date is a calendar date at
+   * midnight UTC.
+   */
+  async fetchOccurrenceDates(
+    eventUrl: string,
+    uid: string,
+    timeRange: { start: Date; end: Date },
+  ): Promise<CalDavResponse<Date[]>> {
+    return asResult(async () => {
+      const result = await davRequest({
+        url: getCalendarUrlFromEventUrl(eventUrl),
+        method: "REPORT",
+        body: buildCalendarQueryXml({ timeRange, expand: true, uid }),
+        depth: "1",
+      });
+      if (!result.success || !result.responses) {
+        throw davFailure(result, "Failed to expand event");
+      }
+      // A failed entry can be the event itself. Without it, the occurrence
+      // looks cancelled.
+      const failed = result.responses.find((r) => !r.ok);
+      if (failed) throw davFailure({ status: failed.status }, "Failed to expand event");
+      return result.responses
+        .filter((r) => r.props?.calendarData)
+        .flatMap((r) => convertIcsCalendar(undefined, r.props?.calendarData as string).events ?? [])
+        .filter((e) => e.uid === uid)
+        .map((e) => e.recurrenceId?.value.date ?? e.start.date);
+    }, "Failed to expand event");
+  }
+
   async fetchEvent(eventUrl: string): Promise<CalDavResponse<CalDavEvent>> {
     return asResult(async () => {
       const result = await davRequest({
@@ -884,7 +959,7 @@ export class CalDavService {
       });
 
       if (!result.success || result.body === undefined) {
-        throw new Error(result.error ?? `Event not found: ${result.status}`);
+        throw davFailure(result, "Event not found");
       }
 
       const calendarUrl = getCalendarUrlFromEventUrl(eventUrl);
@@ -1260,61 +1335,35 @@ export class CalDavService {
   // Scheduling (iTIP - RFC 5546)
   // ============================================================================
 
-  async respondToMeeting(
+  /**
+   * Respond to an invitation, for the whole series or for one occurrence.
+   *
+   * The method reads the event from the server, because a local copy can
+   * be stale. It applies the response of the attendee to that copy and
+   * keeps the details that the organizer controls. The write increments
+   * SEQUENCE. For one occurrence, it adds or updates an override. It does
+   * not add an EXDATE to the master. It writes with the ETag of the read.
+   *
+   * A 412 means that the precondition of the write failed: the event
+   * changed or was deleted after the read. The method then reads and
+   * checks the event again, and tries once more.
+   *
+   * `data` tells if the method wrote the response. A "blocked" outcome
+   * gives the reason of the refusal: a cancelled or deleted event, a
+   * removed attendee, or an occurrence that is no longer in the event.
+   */
+  async respondToInvitation(
     eventUrl: string,
-    event: IcsEvent,
-    attendeeEmail: string,
-    status: CalDavAttendee["partstat"],
-    etag?: string,
-  ): Promise<CalDavResponse<SchedulingResponse>> {
-    const attendee = event.attendees?.find(
-      (a) => a.email.toLowerCase() === attendeeEmail.toLowerCase(),
-    );
-
-    if (!attendee) {
-      return { success: false, error: "Attendee not found in event" };
-    }
-
-    // Update the event with the new participation status
-    // Sabre/DAV will automatically detect the change and send a REPLY to the organizer
-    const updatedEvent = {
-      ...event,
-      attendees: event.attendees?.map((att) =>
-        att.email.toLowerCase() === attendeeEmail.toLowerCase()
-          ? { ...att, partstat: status }
-          : att,
-      ),
-    };
-
-    const result = await this.updateEvent({
-      eventUrl,
-      event: updatedEvent,
-      etag,
-    });
-
-    if (!result.success) {
-      // Propagate the HTTP status (notably 412) so the caller's
-      // refetch-and-retry-on-stale-ETag path can fire. Dropping it here
-      // made a second RSVP in the same modal session fail silently.
-      return {
-        success: false,
-        status: result.status,
-        error: result.error || "Failed to update event",
-      };
-    }
-
-    return {
-      success: true,
-      data: {
-        success: true,
-        responses: [
-          {
-            recipient: event.organizer?.email || "",
-            status: "delivered" as const,
-          },
-        ],
-      },
-    };
+    response: InvitationResponse,
+  ): Promise<CalDavResponse<InvitationOutcome>> {
+    return asResult(async () => {
+      try {
+        return await this.writeInvitationResponse(eventUrl, response);
+      } catch (error) {
+        if (!(error instanceof DavCallError) || error.status !== 412) throw error;
+        return this.writeInvitationResponse(eventUrl, response);
+      }
+    }, "Failed to respond to invitation");
   }
 
   // ============================================================================
@@ -1432,6 +1481,92 @@ export class CalDavService {
   // ============================================================================
   // Private Helper Methods
   // ============================================================================
+
+  /** Read the event from the server, check it, and write the response. */
+  private async writeInvitationResponse(
+    eventUrl: string,
+    { uid, attendeeEmail, partstat, occurrence }: InvitationResponse,
+  ): Promise<InvitationOutcome> {
+    const fetched = await this.fetchEvent(eventUrl);
+    if (!fetched.success || !fetched.data) {
+      if (fetched.status === 404) return { kind: "blocked", blocker: "deleted" };
+      throw davFailure(fetched, "Failed to fetch event");
+    }
+    const { data, etag } = fetched.data;
+
+    const resolved = resolveRsvpEvent(data.events, uid, occurrence);
+    const scheduled = occurrence
+      ? await this.isScheduled(eventUrl, uid, occurrence, resolved.override)
+      : undefined;
+    const blocker = findRsvpBlocker(resolved, attendeeEmail, scheduled);
+    if (blocker) return { kind: "blocked", blocker };
+
+    const { master, override } = resolved;
+    // An event without RRULE has no occurrences: answer the event itself.
+    // A copy without master holds only overrides: answer the override in
+    // place.
+    if (occurrence && master && (override || master.recurrenceRule)) {
+      // With an unknown TZID, the wall-clock time of the occurrence falls
+      // back to UTC, and the override targets another occurrence.
+      const timezone = master.start.local?.timezone;
+      if (timezone && !isKnownTimezone(timezone)) {
+        throw new Error(`Unknown timezone of the series: ${timezone}`);
+      }
+      const reply = buildOccurrenceReply(resolved, occurrence, attendeeEmail, partstat);
+      if (!reply) throw new Error("Occurrence not found");
+      const seriesTime = toSeriesWallClock(master, occurrence);
+      const written = await this.createOverrideInstance(eventUrl, reply, seriesTime, etag);
+      if (!written.success) throw davFailure(written, "Failed to write the response");
+      return { kind: "responded" };
+    }
+
+    const single = master ?? override;
+    const targets = occurrence ? (single ? [single] : []) : seriesTargets(resolved, attendeeEmail);
+    if (targets.length === 0) throw new Error("Event not found");
+    // Write the calendar of the read, so that the other VEVENTs stay as the
+    // server has them.
+    const events = data.events?.map((e) =>
+      targets.includes(e)
+        ? { ...withPartstat(e, attendeeEmail, partstat), sequence: (e.sequence ?? 0) + 1 }
+        : e,
+    );
+    const calendar = { ...data, events };
+    this.validateTimezones(calendar);
+    const written = await davRequest({
+      url: eventUrl,
+      method: "PUT",
+      body: generateIcsCalendar(calendar),
+      contentType: "text/calendar; charset=utf-8",
+      headers: etag ? { "If-Match": etag } : undefined,
+    });
+    if (!written.success) throw davFailure(written, "Failed to write the response");
+    return { kind: "responded" };
+  }
+
+  /**
+   * Tell if an occurrence is present in the event. An override makes it
+   * present, also a cancelled override. Otherwise the server expansion of
+   * the RRULE must contain the occurrence. The override can start on
+   * another day, so the expansion window can miss it.
+   *
+   * findRsvpBlocker checks the cancellation and the attendee.
+   */
+  private async isScheduled(
+    eventUrl: string,
+    uid: string,
+    instant: Date,
+    override: IcsEvent | undefined,
+  ): Promise<boolean> {
+    if (override) return true;
+    const expanded = await this.fetchOccurrenceDates(eventUrl, uid, {
+      start: new Date(instant.getTime() - DAY_MS),
+      end: new Date(instant.getTime() + DAY_MS),
+    });
+    if (!expanded.success || !expanded.data) {
+      throw davFailure(expanded, "Failed to expand event");
+    }
+    return expanded.data.some((d) => d.getTime() === instant.getTime());
+  }
 
   private validateTimezones(calendarData: IcsCalendar): void {
     const usedTimezones =

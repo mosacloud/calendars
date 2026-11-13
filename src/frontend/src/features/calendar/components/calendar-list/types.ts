@@ -19,6 +19,8 @@ export interface CalendarModalProps {
     includeInAvailability?: boolean,
   ) => Promise<void>;
   isOnboarding?: boolean;
+  /** Onboarding only: lets the user close the modal without creating a calendar. */
+  canDismissOnboarding?: boolean;
 }
 
 /**
@@ -28,7 +30,19 @@ export interface CalendarItemMenuProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onEdit: () => void;
-  onDelete: () => void;
+  /** Asks to confirm the delete for every user. Set it for the owner only. */
+  onDelete?: () => void;
+  /** Asks to confirm that the user leaves the calendar. Set it for a sharee only. */
+  onLeave?: () => void;
+  /** Removes the ordinary delete and leave actions, unless onDeleteForMailbox is set. */
+  syncManaged?: boolean;
+  /**
+   * Asks to confirm the delete for every user of the mailbox. Set it for a
+   * mailbox admin only. It replaces the delete and leave actions.
+   */
+  onDeleteForMailbox?: () => void;
+  /** Hides the calendar for the user (see `CalDavCalendar.hidden`). Set it for a sharee only. */
+  onHide?: () => void;
   onShare?: () => void;
   onImport?: () => void;
   onSubscription?: () => void;
@@ -37,12 +51,17 @@ export interface CalendarItemMenuProps {
   onMoveDown?: () => void;
 }
 
-/**
- * Props for the DeleteConfirmModal component.
- */
 export interface DeleteConfirmModalProps {
-  isOpen: boolean;
-  calendarName: string;
+  /** The calendar to delete or to leave. The modal is open when it is set. */
+  calendar: CalDavCalendar | null;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}
+
+export interface MailboxCalendarDeleteModalProps {
+  /** The calendar to delete. The modal is open when it is set. */
+  calendar: CalDavCalendar | null;
   onConfirm: () => void;
   onCancel: () => void;
   isLoading: boolean;
@@ -55,12 +74,15 @@ export interface CalendarListItemProps {
   calendar: CalDavCalendar;
   isVisible: boolean;
   isMenuOpen: boolean;
-  /** Mailbox email if this calendar is mailbox-backed; undefined otherwise. */
-  mailboxEmail?: string;
   onToggleVisibility: (url: string) => void;
   onMenuToggle: (url: string) => void;
   onEdit: (calendar: CalDavCalendar) => void;
+  /** Asks to delete the calendar, or to leave it for a sharee. */
   onDelete: (calendar: CalDavCalendar) => void;
+  /** Set it when the user is an admin of the mailbox of the calendar. */
+  onDeleteForMailbox?: (calendar: CalDavCalendar) => void;
+  /** Hides the calendar for the user (see `CalDavCalendar.hidden`). The item uses it for a sharee only. */
+  onHide?: (calendar: CalDavCalendar) => void;
   onShare?: (calendar: CalDavCalendar) => void;
   onImport?: (calendar: CalDavCalendar) => void;
   onSubscription?: (calendar: CalDavCalendar) => void;
@@ -85,13 +107,4 @@ export interface CalendarModalState {
 export interface ShareModalState {
   isOpen: boolean;
   calendar: CalDavCalendar | null;
-}
-
-/**
- * State for the delete confirmation.
- */
-export interface DeleteState {
-  isOpen: boolean;
-  calendar: CalDavCalendar | null;
-  isLoading: boolean;
 }

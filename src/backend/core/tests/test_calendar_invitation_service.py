@@ -6,7 +6,7 @@ import re
 from unittest.mock import MagicMock, patch
 
 from django.template.loader import render_to_string
-from django.test import Client
+from django.test import Client, override_settings
 
 import pytest
 import requests
@@ -359,6 +359,151 @@ class TestEmailTemplateVisioUrl:
         context = self._build_context(event)
         txt = render_to_string("emails/calendar_invitation.txt", context)
         assert "Visio" not in txt
+
+
+@pytest.mark.django_db
+class TestEmailTemplateLayout:
+    """Tests for the logo images, the labels and the mobile layout of the emails."""
+
+    def _build_context(self, method="REQUEST", lang="fr"):
+        event = ICalendarParser.parse(ICS_WITH_URL, "bob@example.com")
+        service = CalendarInvitationService()
+        return service._build_template_context(event, method, lang=lang)
+
+    @override_settings(APP_URL="https://calendars.example")
+    def test_html_images_are_served_from_app_url(self):
+        html = render_to_string(
+            "emails/calendar_invitation.html", self._build_context()
+        )
+        for name in (
+            "logo-calendriers",
+            "icon-link-blue",
+            "icon-check-white",
+        ):
+            assert f'src="https://calendars.example/static/images/{name}.png"' in html
+
+    @override_settings(APP_URL="https://calendars.example", EMAIL_FOOTER_IMG=None)
+    def test_html_has_no_footer_image_by_default(self):
+        html = render_to_string(
+            "emails/calendar_invitation.html", self._build_context()
+        )
+        assert html.count("<img") == 5
+        assert "border-top:1px solid #e5e5e5" not in html
+
+    @override_settings(
+        APP_URL="https://calendars.example",
+        EMAIL_FOOTER_IMG="https://cdn.example/footer.png",
+    )
+    def test_footer_image_follows_the_setting(self):
+        html = render_to_string(
+            "emails/calendar_invitation.html", self._build_context()
+        )
+        assert 'src="https://cdn.example/footer.png"' in html
+        assert "border-top:1px solid #e5e5e5" in html
+
+    @override_settings(
+        APP_URL="https://calendars.example",
+        EMAIL_LOGO_IMG="https://cdn.example/logo.png",
+    )
+    def test_logo_follows_the_email_logo_setting(self):
+        html = render_to_string(
+            "emails/calendar_invitation.html", self._build_context()
+        )
+        assert 'src="https://cdn.example/logo.png"' in html
+        assert "logo-calendriers.png" not in html
+
+    def test_invitation_html_stacks_buttons_by_default(self):
+        html = render_to_string(
+            "emails/calendar_invitation.html", self._build_context()
+        )
+        assert html.count('class="action-cell" style="display:block;') == 3
+        assert "@media only screen and (min-width: 601px)" in html
+
+    def test_cancel_html_has_no_button_cells(self):
+        context = self._build_context(method="CANCEL")
+        html = render_to_string("emails/calendar_invitation_cancel.html", context)
+        assert 'class="action-cell"' not in html
+        assert "images/icon-close-red.png" in html
+
+    def test_labels_carry_the_colon_of_the_language(self):
+        html_fr = render_to_string(
+            "emails/calendar_invitation.html", self._build_context()
+        )
+        html_en = render_to_string(
+            "emails/calendar_invitation.html", self._build_context(lang="en")
+        )
+        assert "Quand\u00a0:" in html_fr
+        assert "When:" in html_en
+
+
+# REPLY sent by the attendee (Bob) to the organizer (Alice)
+ICS_REPLY = """BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//EN
+METHOD:REPLY
+BEGIN:VEVENT
+UID:test-reply-1
+DTSTART:20260210T140000Z
+DTEND:20260210T150000Z
+SUMMARY:Simple meeting
+ORGANIZER;CN=Alice:mailto:alice@example.com
+ATTENDEE;CN=Bob;PARTSTAT=ACCEPTED:mailto:Bob@Example.com
+SEQUENCE:0
+END:VEVENT
+END:VCALENDAR"""
+
+
+@pytest.mark.django_db
+class TestReplyEmail:
+    """The reply email names the attendee that answers, not the organizer."""
+
+    def test_parse_takes_the_given_attendee(self):
+        event = ICalendarParser.parse(ICS_REPLY, "bob@example.com")
+        assert event.attendee_email == "bob@example.com"
+        assert event.attendee_name == "Bob"
+        assert event.organizer_email == "alice@example.com"
+
+    def test_parse_request_still_matches_the_recipient(self):
+        event = ICalendarParser.parse(ICS_WITH_URL, "bob@example.com")
+        assert event.attendee_email == "bob@example.com"
+        assert event.attendee_name == "Bob"
+
+    @staticmethod
+    def _send_reply(icalendar_data):
+        service = CalendarInvitationService()
+        with patch.object(
+            CalendarInvitationService, "_send_email", return_value=True
+        ) as mock_send_email:
+            result = service.send_invitation(
+                sender_email="mailto:bob@example.com",
+                recipient_email="mailto:alice@example.com",
+                method="REPLY",
+                icalendar_data=icalendar_data,
+            )
+        assert result is True
+        return mock_send_email.call_args.kwargs
+
+    def test_reply_email_body_names_the_attendee(self):
+        kwargs = self._send_reply(ICS_REPLY)
+
+        assert kwargs["to_email"] == "alice@example.com"
+        for body in (kwargs["text_body"], kwargs["html_body"]):
+            assert "Bob (bob@example.com)" in body
+            assert "alice@example.com" not in body
+
+    def test_reply_email_names_the_sender_when_another_attendee_is_first(self):
+        # A delegation REPLY can list the delegate before the sender.
+        ics = ICS_REPLY.replace(
+            "ATTENDEE;CN=Bob",
+            "ATTENDEE;CN=Carol;PARTSTAT=NEEDS-ACTION:mailto:carol@example.com\n"
+            "ATTENDEE;CN=Bob",
+        )
+
+        kwargs = self._send_reply(ics)
+
+        for body in (kwargs["text_body"], kwargs["html_body"]):
+            assert "Bob (bob@example.com)" in body
+            assert "Carol" not in body
 
 
 # ICS template for mailbox invitation tests

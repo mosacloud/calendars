@@ -1,48 +1,66 @@
 /**
  * CalendarList component - List of calendars with visibility toggles.
- * Shows onboarding modal when user has no calendars.
+ * It prompts users without a calendar of their own to create one. Users
+ * with shared or hidden calendars can dismiss the prompt. Users with no
+ * calendar must create one.
  */
 
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCalendarContext } from "../../contexts";
 import { setupCalendar } from "@/features/mailbox/api";
+import { useMailboxContext } from "@/features/mailbox/MailboxContext";
+import {
+  getCalendarGroup,
+  isMailboxCalendarAdmin,
+} from "@/features/calendar/utils/calendar-ownership";
 import { addToast, ToasterItem } from "@/features/ui/components/toaster/Toaster";
 import { CalendarModal } from "./CalendarModal";
 import { CalendarShareModal } from "./CalendarShareModal";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
+import { MailboxCalendarDeleteModal } from "./MailboxCalendarDeleteModal";
 import { ImportEventsModal } from "./ImportEventsModal";
 import { SubscriptionUrlModal } from "./SubscriptionUrlModal";
 import { CalendarListItem } from "./CalendarListItem";
+import { CalendarHiddenToast } from "./CalendarHiddenToast";
+import { useCalendarDelete } from "./hooks/useCalendarDelete";
+import { useCalendarHiding } from "./hooks/useCalendarHiding";
 import { useCalendarListState } from "./hooks/useCalendarListState";
-import { extractCaldavPath } from "./utils";
-import { Plus, ChevronDown } from "@gouvfr-lasuite/ui-kit/icons";
+import { useMailboxCalendarDelete } from "./hooks/useMailboxCalendarDelete";
+import { extractCaldavPath, loadOnboardingDismissed, saveOnboardingDismissed } from "./utils";
+import { Plus } from "@gouvfr-lasuite/ui-components/icons";
 
 import type { CalDavCalendar } from "../../services/dav/types/caldav-service";
 
 export const CalendarList = () => {
   const { t } = useTranslation();
   const {
-    ownedCalendars,
-    sharedCalendars,
-    davCalendars,
+    orderedCalendars,
+    hiddenCalendars,
     visibleCalendarUrls,
     toggleCalendarVisibility,
     createCalendar,
     updateCalendar,
     deleteCalendar,
+    deleteMailboxCalendar,
     moveCalendar,
+    setCalendarHidden,
     refreshCalendars,
     calendarRef,
     isLoading: isCalendarLoading,
   } = useCalendarContext();
 
+  const handleDeleteError = useCallback(() => {
+    addToast(
+      <ToasterItem type="error" closeButton>
+        {t("calendar.deleteCalendar.error")}
+      </ToasterItem>,
+    );
+  }, [t]);
+
   const {
     modalState,
-    deleteState,
     shareModalState,
-    isMyCalendarsExpanded,
-    isSharedCalendarsExpanded,
     openMenuUrl,
     handleOpenCreateModal,
     handleOpenEditModal,
@@ -50,21 +68,55 @@ export const CalendarList = () => {
     handleSaveCalendar,
     handleOpenShareModal,
     handleCloseShareModal,
-    handleOpenDeleteModal,
-    handleCloseDeleteModal,
-    handleConfirmDelete,
     handleMenuToggle,
     handleCloseMenu,
-    handleToggleMyCalendars,
-    handleToggleSharedCalendars,
-  } = useCalendarListState({
-    createCalendar,
-    updateCalendar,
-    deleteCalendar,
+  } = useCalendarListState({ createCalendar, updateCalendar });
+
+  const calendarDelete = useCalendarDelete({ deleteCalendar, onError: handleDeleteError });
+
+  const { availableMailboxes } = useMailboxContext();
+  const mailboxDelete = useMailboxCalendarDelete({
+    deleteMailboxCalendar,
+    onError: handleDeleteError,
   });
 
-  // Onboarding: show modal when user has no calendars at all
-  const showOnboarding = !isCalendarLoading && davCalendars.length === 0;
+  const handleHidingError = useCallback(
+    (hidden: boolean) => {
+      addToast(
+        <ToasterItem type="error" closeButton>
+          {t(hidden ? "calendar.list.hideError" : "calendar.list.showAgainError")}
+        </ToasterItem>,
+      );
+    },
+    [t],
+  );
+  const { hide: hideCalendar, show: showCalendar } = useCalendarHiding({
+    setCalendarHidden,
+    onError: handleHidingError,
+  });
+  const handleHide = useCallback(
+    (calendar: CalDavCalendar) => {
+      void hideCalendar(calendar).then((hidden) => {
+        if (!hidden) return;
+        addToast(<CalendarHiddenToast onUndo={() => void showCalendar(calendar)} />);
+      });
+    },
+    [hideCalendar, showCalendar],
+  );
+
+  const [isOnboardingDismissed, setIsOnboardingDismissed] = useState(loadOnboardingDismissed);
+  const dismissOnboarding = () => {
+    setIsOnboardingDismissed(true);
+    saveOnboardingDismissed();
+  };
+  // A hidden calendar is a calendar that the user can show again.
+  const canDismissOnboarding = orderedCalendars.length > 0 || hiddenCalendars.length > 0;
+  // The user acts for a mailbox calendar as for an own one.
+  const isUsersCalendar = (calendar: CalDavCalendar) => getCalendarGroup(calendar) !== "shared";
+  const showOnboarding =
+    !isCalendarLoading &&
+    !orderedCalendars.some(isUsersCalendar) &&
+    (!canDismissOnboarding || !isOnboardingDismissed);
 
   // Wrap save to handle mailbox calendar creation
   const handleSaveWithMailbox = useCallback(
@@ -131,16 +183,15 @@ export const CalendarList = () => {
     }
   }, [calendarRef]);
 
-  const handleMoveUp = useCallback(
-    (calendar: CalDavCalendar) => {
-      // moveCalendar resolves with `{success: false, error}` when any
-      // PROPPATCH fails — surface that to the user instead of swallowing
-      // it (and instead of leaving the visible state quietly stale).
-      void moveCalendar(calendar.url, "up").then((result) => {
+  const handleMove = useCallback(
+    (calendar: CalDavCalendar, direction: "up" | "down") => {
+      // The error text is not translated, so log it and show a translated toast.
+      void moveCalendar(calendar.url, direction).then((result) => {
         if (!result.success) {
+          console.error("Failed to move calendar:", result.error);
           addToast(
             <ToasterItem type="error" closeButton>
-              {result.error || t("calendar.error.fetchCalendars")}
+              {t("calendar.error.reorderCalendars")}
             </ToasterItem>,
           );
         }
@@ -149,19 +200,14 @@ export const CalendarList = () => {
     [moveCalendar, t],
   );
 
+  const handleMoveUp = useCallback(
+    (calendar: CalDavCalendar) => handleMove(calendar, "up"),
+    [handleMove],
+  );
+
   const handleMoveDown = useCallback(
-    (calendar: CalDavCalendar) => {
-      void moveCalendar(calendar.url, "down").then((result) => {
-        if (!result.success) {
-          addToast(
-            <ToasterItem type="error" closeButton>
-              {result.error || t("calendar.error.fetchCalendars")}
-            </ToasterItem>,
-          );
-        }
-      });
-    },
-    [moveCalendar, t],
+    (calendar: CalDavCalendar) => handleMove(calendar, "down"),
+    [handleMove],
   );
 
   return (
@@ -169,18 +215,7 @@ export const CalendarList = () => {
       <div className="calendar-list">
         <div className="calendar-list__section">
           <div className="calendar-list__section-header">
-            <button
-              className="calendar-list__toggle-btn"
-              onClick={handleToggleMyCalendars}
-              aria-expanded={isMyCalendarsExpanded}
-            >
-              <ChevronDown
-                className={`calendar-list__toggle-icon ${
-                  isMyCalendarsExpanded ? "calendar-list__toggle-icon--expanded" : ""
-                }`}
-              />
-              <span className="calendar-list__section-title">{t("calendar.list.myCalendars")}</span>
-            </button>
+            <span className="calendar-list__section-title">{t("calendar.list.title")}</span>
             <button
               className="calendar-list__add-btn"
               onClick={handleOpenCreateModal}
@@ -190,82 +225,42 @@ export const CalendarList = () => {
               <Plus />
             </button>
           </div>
-          {isMyCalendarsExpanded && (
-            <div className="calendar-list__items">
-              {ownedCalendars.map((calendar, idx) => (
-                <CalendarListItem
-                  key={calendar.url}
-                  calendar={calendar}
-                  isVisible={visibleCalendarUrls.has(calendar.url)}
-                  isMenuOpen={openMenuUrl === calendar.url}
-                  mailboxEmail={calendar.mailboxEmail}
-                  onToggleVisibility={toggleCalendarVisibility}
-                  onMenuToggle={handleMenuToggle}
-                  onEdit={handleOpenEditModal}
-                  onDelete={handleOpenDeleteModal}
-                  onShare={handleOpenShareModal}
-                  onImport={handleOpenImportModal}
-                  onSubscription={handleOpenSubscriptionModal}
-                  onMoveUp={idx > 0 ? handleMoveUp : undefined}
-                  onMoveDown={idx < ownedCalendars.length - 1 ? handleMoveDown : undefined}
-                  onCloseMenu={handleCloseMenu}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {sharedCalendars.length > 0 && (
-          <div className="calendar-list__section">
-            <div className="calendar-list__section-header">
-              <button
-                className="calendar-list__toggle-btn"
-                onClick={handleToggleSharedCalendars}
-                aria-expanded={isSharedCalendarsExpanded}
-              >
-                <ChevronDown
-                  className={`calendar-list__toggle-icon ${
-                    isSharedCalendarsExpanded ? "calendar-list__toggle-icon--expanded" : ""
-                  }`}
-                />
-                <span className="calendar-list__section-title">
-                  {t("calendar.list.sharedCalendars")}
-                </span>
-              </button>
-            </div>
-            {isSharedCalendarsExpanded && (
-              <div className="calendar-list__items">
-                {sharedCalendars.map((calendar, idx) => (
-                  <CalendarListItem
-                    key={calendar.url}
-                    calendar={calendar}
-                    isVisible={visibleCalendarUrls.has(calendar.url)}
-                    isMenuOpen={openMenuUrl === calendar.url}
-                    mailboxEmail={calendar.mailboxEmail}
-                    onToggleVisibility={toggleCalendarVisibility}
-                    onMenuToggle={handleMenuToggle}
-                    onEdit={handleOpenEditModal}
-                    onDelete={handleOpenDeleteModal}
-                    onImport={handleOpenImportModal}
-                    onSubscription={handleOpenSubscriptionModal}
-                    onMoveUp={idx > 0 ? handleMoveUp : undefined}
-                    onMoveDown={idx < sharedCalendars.length - 1 ? handleMoveDown : undefined}
-                    onCloseMenu={handleCloseMenu}
-                  />
-                ))}
-              </div>
-            )}
+          <div className="calendar-list__items">
+            {orderedCalendars.map((calendar, idx) => (
+              <CalendarListItem
+                key={calendar.url}
+                calendar={calendar}
+                isVisible={visibleCalendarUrls.has(calendar.url)}
+                isMenuOpen={openMenuUrl === calendar.url}
+                onToggleVisibility={toggleCalendarVisibility}
+                onMenuToggle={handleMenuToggle}
+                onEdit={handleOpenEditModal}
+                onDelete={calendarDelete.open}
+                onDeleteForMailbox={
+                  isMailboxCalendarAdmin(calendar, availableMailboxes)
+                    ? mailboxDelete.open
+                    : undefined
+                }
+                onHide={handleHide}
+                onShare={isUsersCalendar(calendar) ? handleOpenShareModal : undefined}
+                onImport={handleOpenImportModal}
+                onSubscription={handleOpenSubscriptionModal}
+                onMoveUp={idx > 0 ? handleMoveUp : undefined}
+                onMoveDown={idx < orderedCalendars.length - 1 ? handleMoveDown : undefined}
+                onCloseMenu={handleCloseMenu}
+              />
+            ))}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Onboarding modal: shown when user has no calendars */}
       <CalendarModal
         isOpen={showOnboarding}
         mode="create"
-        onClose={() => {}}
+        onClose={dismissOnboarding}
         onSave={handleSaveWithMailbox}
         isOnboarding
+        canDismissOnboarding={canDismissOnboarding}
       />
 
       {/* Normal create/edit modal */}
@@ -284,11 +279,17 @@ export const CalendarList = () => {
       />
 
       <DeleteConfirmModal
-        isOpen={deleteState.isOpen}
-        calendarName={deleteState.calendar?.displayName || ""}
-        onConfirm={handleConfirmDelete}
-        onCancel={handleCloseDeleteModal}
-        isLoading={deleteState.isLoading}
+        calendar={calendarDelete.calendar}
+        onConfirm={calendarDelete.confirm}
+        onCancel={calendarDelete.close}
+        isLoading={calendarDelete.isLoading}
+      />
+
+      <MailboxCalendarDeleteModal
+        calendar={mailboxDelete.calendar}
+        onConfirm={mailboxDelete.confirm}
+        onCancel={mailboxDelete.close}
+        isLoading={mailboxDelete.isLoading}
       />
 
       {subscriptionModal.isOpen && subscriptionModal.caldavPath && (
