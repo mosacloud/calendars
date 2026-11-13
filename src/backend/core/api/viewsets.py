@@ -15,12 +15,21 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import UserRateThrottle
 
 from core import models
+from core.authentication.silent_login import get_silent_login_blockers
 from core.services.caldav_service import (
     normalize_caldav_path,
     verify_caldav_access,
 )
 from core.services.import_service import MAX_FILE_SIZE
 from core.services.resource_service import ResourceProvisioningError, ResourceService
+from core.services.setup_service import (
+    MailboxAccessDeniedError,
+    MailboxAdminRequiredError,
+    MailboxCalendarNotFoundError,
+    MessagesDisabledError,
+    SetupService,
+    SetupServiceError,
+)
 
 from . import permissions, serializers
 
@@ -90,7 +99,7 @@ class UserViewSet(
     """User ViewSet"""
 
     permission_classes = [permissions.IsSelf]
-    queryset = models.User.objects.all().filter(is_active=True)
+    queryset = models.User.objects.filter(is_active=True)
     serializer_class = serializers.UserSerializer
     get_me_serializer_class = serializers.UserMeSerializer
     pagination_class = UserListPagination
@@ -125,7 +134,7 @@ class UserViewSet(
         # Search by email (partial, case-insensitive) or full name
         return queryset.filter(
             Q(email__icontains=query) | Q(full_name__icontains=query)
-        ).order_by("full_name", "email")[:50]
+        ).order_by("full_name", "email")
 
     @action(
         detail=False,
@@ -156,6 +165,7 @@ class ConfigView(views.APIView):
         array_settings = [
             "ENVIRONMENT",
             "FRONTEND_THEME",
+            "FRONTEND_SILENT_LOGIN_ENABLED",
             "FRONTEND_MORE_LINK",
             "FRONTEND_FEEDBACK_BUTTON_SHOW",
             "FRONTEND_FEEDBACK_BUTTON_IDLE",
@@ -183,6 +193,9 @@ class ConfigView(views.APIView):
         for setting in array_settings:
             if hasattr(settings, setting):
                 dict_settings[setting] = getattr(settings, setting)
+
+        if get_silent_login_blockers():
+            dict_settings["FRONTEND_SILENT_LOGIN_ENABLED"] = False
 
         dict_settings["theme_customization"] = self._load_theme_customization()
 
@@ -290,16 +303,25 @@ class OrganizationSettingsViewSet(viewsets.ViewSet):
         return response.Response(serializers.OrganizationSerializer(org).data)
 
 
+MAILBOX_CALENDAR_ERROR_STATUSES = {
+    MessagesDisabledError: status.HTTP_404_NOT_FOUND,
+    MailboxAccessDeniedError: status.HTTP_403_FORBIDDEN,
+    MailboxAdminRequiredError: status.HTTP_403_FORBIDDEN,
+    MailboxCalendarNotFoundError: status.HTTP_404_NOT_FOUND,
+}
+
+
 class CalendarViewSet(viewsets.GenericViewSet):
     """ViewSet for calendar operations.
 
     import_events: Import events from an ICS file.
+    delete_mailbox_calendar: Delete a mailbox calendar for every user.
     """
 
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
-        if self.action == "import_events":
+        if self.action in ("import_events", "delete_mailbox_calendar"):
             return [permissions.IsEntitledToAccess()]
         return super().get_permissions()
 
@@ -369,6 +391,40 @@ class CalendarViewSet(viewsets.GenericViewSet):
             status=status.HTTP_202_ACCEPTED,
         )
 
+    @action(
+        detail=False,
+        methods=["delete"],
+        url_path=r"mailboxes/(?P<mailbox_email>[^/]+)/(?P<calendar_uri>[^/]+)",
+        url_name="mailbox-calendar",
+    )
+    def delete_mailbox_calendar(self, request, mailbox_email, calendar_uri):
+        """Delete a calendar of a mailbox for every user of the mailbox.
+
+        DELETE /api/v1.0/calendars/mailboxes/{mailbox_email}/{calendar_uri}/
+
+        ``calendar_uri`` is the URI of the user's own instance.
+        """
+        try:
+            SetupService().delete_mailbox_calendar(
+                request.user, mailbox_email, calendar_uri
+            )
+        except SetupServiceError as exc:
+            logger.warning(
+                "Mailbox calendar delete rejected for user %s (mailbox=%s, code=%s): %s",
+                request.user.pk,
+                mailbox_email,
+                exc.code,
+                exc,
+            )
+            # The message can hold internal details, so return only the code.
+            return response.Response(
+                {"code": exc.code, "detail": "Calendar deletion failed."},
+                status=MAILBOX_CALENDAR_ERROR_STATUSES.get(
+                    type(exc), status.HTTP_500_INTERNAL_SERVER_ERROR
+                ),
+            )
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class ResourceViewSet(viewsets.ViewSet):
     """ViewSet for resource provisioning (create/delete).
@@ -398,8 +454,10 @@ class ResourceViewSet(viewsets.ViewSet):
         try:
             result = service.create_resource(request.user, name, resource_type)
         except ResourceProvisioningError as e:
+            # The message can hold internal details, so return only the code.
+            logger.warning("Resource request failed (code=%s): %s", e.code, e)
             return response.Response(
-                {"detail": str(e)},
+                {"code": e.code, "detail": "Resource request failed."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -421,8 +479,10 @@ class ResourceViewSet(viewsets.ViewSet):
         try:
             service.delete_resource(request.user, resource_id)
         except ResourceProvisioningError as e:
+            # The message can hold internal details, so return only the code.
+            logger.warning("Resource request failed (code=%s): %s", e.code, e)
             return response.Response(
-                {"detail": str(e)},
+                {"code": e.code, "detail": "Resource request failed."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

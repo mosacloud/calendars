@@ -15,15 +15,15 @@ import {
   ModalSize,
   Select,
   VariantType,
-} from "@gouvfr-lasuite/cunningham-react";
-import { errorToString } from "@/features/api/APIError";
+} from "@gouvfr-lasuite/ui-components";
 import { useAuth } from "@/features/auth/Auth";
 import { useConfig } from "@/features/config/ConfigProvider";
 import { useMailboxContext } from "@/features/mailbox/MailboxContext";
 import { FeatureFlag, useFeatureFlag } from "@/hooks/useFeatureFlag";
-import { DEFAULT_COLORS } from "./constants";
-import { ErrorFilled, Mail } from "@gouvfr-lasuite/ui-kit/icons";
+import { DEFAULT_COLORS } from "@/features/calendar/constants";
+import { ErrorFilled, Mail } from "@gouvfr-lasuite/ui-components/icons";
 
+import { getCalendarSaveErrorKey } from "./utils";
 import type { CalendarModalProps } from "./types";
 
 const NO_MAILBOX_VALUE = "__none__";
@@ -35,6 +35,7 @@ export const CalendarModal = ({
   onClose,
   onSave,
   isOnboarding = false,
+  canDismissOnboarding = false,
 }: CalendarModalProps) => {
   const { t } = useTranslation();
   const { config } = useConfig();
@@ -137,17 +138,17 @@ export const CalendarModal = ({
         onClose();
       }
     } catch (err) {
-      setError(errorToString(err));
+      console.error("Failed to save calendar", err);
+      setError(t(getCalendarSaveErrorKey(err, mode)));
     } finally {
       setIsLoading(false);
     }
   };
 
+  const canClose = !isOnboarding || canDismissOnboarding;
+
   const handleClose = () => {
-    if (isOnboarding) {
-      // Cannot dismiss onboarding modal
-      return;
-    }
+    if (!canClose) return;
     setName("");
     setColor(DEFAULT_COLORS[0]);
     setIncludeInAvailability(true);
@@ -171,13 +172,13 @@ export const CalendarModal = ({
       onClose={handleClose}
       size={ModalSize.MEDIUM}
       title={title}
-      closeOnClickOutside={!isOnboarding}
-      hideCloseButton={isOnboarding}
+      closeOnClickOutside={canClose}
+      hideCloseButton={!canClose}
       rightActions={
         <>
-          {!isOnboarding && (
+          {canClose && (
             <Button color="neutral" onClick={handleClose} disabled={isLoading}>
-              {t("calendar.event.cancel")}
+              {isOnboarding ? t("calendar.onboarding.later") : t("calendar.event.cancel")}
             </Button>
           )}
           <Button
@@ -191,7 +192,13 @@ export const CalendarModal = ({
       }
     >
       <div className="calendar-modal__content">
-        {isOnboarding && (
+        {isOnboarding && canDismissOnboarding && (
+          <p className="calendar-modal__onboarding-text">
+            {t("calendar.onboarding.sharedCalendarsHint")}
+          </p>
+        )}
+
+        {isOnboarding && messagesEnabled && (
           <p className="calendar-modal__onboarding-text">
             {hasMailboxes
               ? t("calendar.onboarding.description")

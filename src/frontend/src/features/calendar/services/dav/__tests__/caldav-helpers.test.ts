@@ -13,12 +13,14 @@ import {
   buildProppatchXml,
   buildCalendarQueryXml,
   parseSharePrivilege,
+  isReadOnlyShareAccess,
   buildShareRequestXml,
   buildUnshareRequestXml,
   parseCalendarComponents,
   parseCalendarOrder,
   getCalendarUrlFromEventUrl,
 } from "../caldav-helpers";
+import { ShareAccess } from "../types/caldav-service";
 import { parseDavErrorMessage } from "@/features/calendar/utils/DavClient";
 
 describe("caldav-helpers", () => {
@@ -256,6 +258,22 @@ describe("caldav-helpers", () => {
         expect(result).not.toContain("<C:expand");
         expect(result).toContain("<C:calendar-data/>");
       });
+
+      it("filters by UID instead of time-range, and still expands", () => {
+        const result = buildCalendarQueryXml({
+          timeRange: {
+            start: "2026-05-01T00:00:00Z",
+            end: "2026-06-01T00:00:00Z",
+          },
+          expand: true,
+          uid: "a&b",
+        });
+        expect(result).toContain(
+          '<C:prop-filter name="UID"><C:text-match collation="i;octet">a&amp;b</C:text-match>',
+        );
+        expect(result).not.toContain("<C:time-range");
+        expect(result).toContain('<C:expand start="20260501T000000Z" end="20260601T000000Z"/>');
+      });
     });
   });
 
@@ -387,6 +405,22 @@ describe("caldav-helpers", () => {
   // Response Parsing Helpers
   // ============================================================================
   describe("Response Parsing Helpers", () => {
+    describe("isReadOnlyShareAccess", () => {
+      it("is true for a read share", () => {
+        expect(isReadOnlyShareAccess({ [ShareAccess.READ]: {} })).toBe(true);
+      });
+
+      it("is false for an owner or a read-write share", () => {
+        expect(isReadOnlyShareAccess({ [ShareAccess.SHARED_OWNER]: {} })).toBe(false);
+        expect(isReadOnlyShareAccess({ [ShareAccess.NOT_SHARED]: {} })).toBe(false);
+        expect(isReadOnlyShareAccess({ [ShareAccess.READ_WRITE]: {} })).toBe(false);
+      });
+
+      it("is false when the value is missing", () => {
+        expect(isReadOnlyShareAccess(undefined)).toBe(false);
+      });
+    });
+
     describe("parseCalendarComponents", () => {
       it("returns undefined for empty input", () => {
         expect(parseCalendarComponents(null)).toBeUndefined();

@@ -6,8 +6,10 @@ Requires: CalDAV server running.
 
 # pylint: disable=no-member,broad-exception-caught,unused-variable,too-many-lines
 
+import re
 import secrets
 from datetime import datetime, timedelta
+from unittest import mock
 from urllib.parse import unquote
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape
@@ -3803,3 +3805,459 @@ class TestNonOwnerCannotReshare:
         # Alice's level must be unchanged — the afterPost guard refuses the
         # share_access_level write for a non-owner principal.
         _assert_share_level(owner_client, owner.email, cal_id, alice.email, "freebusy")
+
+
+def _instance_uri(calendar):
+    """Return the last path segment of a calendar URL."""
+    return unquote(str(calendar.url)).rstrip("/").rsplit("/", maxsplit=1)[-1]
+
+
+def _delete_calendar(client, user_email, cal_uri):
+    """DELETE a calendar collection via the CalDAV proxy."""
+    return client.generic("DELETE", f"/caldav/calendars/users/{user_email}/{cal_uri}/")
+
+
+class TestCalendarDeletion:
+    """DELETE on a calendar collection, for owners and for sharees.
+
+    The owner deletes the calendar for every user. A sharee deletes
+    only their own instance; the calendar and the other shares stay.
+    """
+
+    def test_owner_delete_removes_calendar_for_every_sharee(self):
+        """The owner's DELETE removes the calendar and all its shares."""
+        org = factories.OrganizationFactory(external_id="del-owner")
+        owner, owner_client, cal_path = _create_user_with_calendar(org, "owner-del")
+        sharee, _, _ = _create_user_with_calendar(org, "sharee-del")
+        cal_id = _get_cal_id(cal_path)
+        shared_cal = _share_and_find(owner_client, owner, cal_id, sharee, "read")
+
+        resp = _delete_calendar(owner_client, owner.email, cal_id)
+
+        assert resp.status_code == 204
+        assert _propfind_calendar(owner_client, owner.email, cal_id).status_code == 404
+        assert str(shared_cal.url) not in _get_calendar_urls(sharee)
+
+    def test_sharee_delete_removes_only_own_access(self):
+        """A sharee's DELETE removes their instance only."""
+        org = factories.OrganizationFactory(external_id="del-sharee")
+        owner, owner_client, cal_path = _create_user_with_calendar(org, "owner-dsh")
+        leaver, leaver_client, _ = _create_user_with_calendar(org, "leaver-dsh")
+        stayer, _, _ = _create_user_with_calendar(org, "stayer-dsh")
+        cal_id = _get_cal_id(cal_path)
+        _put_event(owner_client, owner.email, cal_id, "del-sharee-ev", "Kept")
+        leaver_cal = _share_and_find(owner_client, owner, cal_id, leaver, "read-write")
+        stayer_cal = _share_and_find(owner_client, owner, cal_id, stayer, "read")
+
+        resp = _delete_calendar(leaver_client, leaver.email, _instance_uri(leaver_cal))
+
+        assert resp.status_code == 204
+        assert str(leaver_cal.url) not in _get_calendar_urls(leaver)
+        assert str(stayer_cal.url) in _get_calendar_urls(stayer)
+        event = _get_event(owner_client, owner.email, cal_id, "del-sharee-ev")
+        assert event.status_code == 200
+        level = _read_share_level(owner_client, owner.email, cal_id, leaver.email)
+        assert level is None
+        _assert_share_level(owner_client, owner.email, cal_id, stayer.email, "read")
+
+
+def _read_sync_managed(client, user_email, cal_uri):
+    """Return the LS:calendar-sync-managed value of a calendar, or None."""
+    body = (
+        '<?xml version="1.0"?>'
+        '<D:propfind xmlns:D="DAV:" '
+        'xmlns:LS="http://lasuite.numerique.gouv.fr/ns/">'
+        "<D:prop><LS:calendar-sync-managed/></D:prop>"
+        "</D:propfind>"
+    )
+    resp = client.generic(
+        "PROPFIND",
+        f"/caldav/calendars/users/{user_email}/{cal_uri}/",
+        data=body,
+        content_type="application/xml",
+        HTTP_DEPTH="0",
+    )
+    assert resp.status_code == 207
+    root = ET.fromstring(resp.content)
+    prop = root.find(".//{http://lasuite.numerique.gouv.fr/ns/}calendar-sync-managed")
+    if prop is None:
+        return None
+    return prop.text or None
+
+
+class TestSyncManagedCalendarDeletion:
+    """DELETE on a mailbox calendar instance.
+
+    Messages manages sync-managed instances. A manual share on a
+    mailbox calendar is an ordinary share.
+    """
+
+    def test_sync_managed_instance_delete_hides_it(self):
+        """DELETE of a sync-managed mailbox instance hides it.
+
+        Regression: SabreDAV deleted the sharee row, and the next
+        mailbox ACL sync created it again. The calendar came back
+        after a page refresh. CalDAV clients send this DELETE, so the
+        server hides the calendar instead of a refusal. The sync keeps
+        the instance URI, so the calendar stays hidden.
+        """
+        org = factories.OrganizationFactory(external_id="del-sync")
+        owner, _, _ = _create_user_with_calendar(org, "owner-dsync")
+        member, member_client, _ = _create_user_with_calendar(org, "member-dsync")
+        mailbox_email = "team@del-sync.com"
+        _create_mailbox_calendar(owner, mailbox_email, org)
+        before_urls = _list_calendar_urls(member)
+        shares = [
+            {
+                "user_email": member.email,
+                "mailbox_email": mailbox_email,
+                "privilege": "read-write",
+            }
+        ]
+        _sync_mailbox_acls(owner, shares)
+        cal_uri = _find_shared_cal_uri(member, before_urls=before_urls)
+        assert _read_sync_managed(member_client, member.email, cal_uri) == "true"
+
+        resp = _delete_calendar(member_client, member.email, cal_uri)
+
+        assert resp.status_code == 204
+        assert (
+            _propfind_calendar(member_client, member.email, cal_uri).status_code == 207
+        )
+
+        _sync_mailbox_acls(owner, shares, full_sync_users=[member.email])
+
+        assert cal_uri not in _home_listing(member_client, member.email)
+        assert (
+            _home_listing(member_client, member.email, include_hidden=True)[cal_uri]
+            == "true"
+        )
+
+    def test_manual_share_on_mailbox_calendar_can_be_deleted(self):
+        """A sharee can delete a manual share of a mailbox calendar.
+
+        Only sync-managed instances are protected. A read share that a
+        mailbox member adds by hand is an ordinary share.
+        """
+        org = factories.OrganizationFactory(external_id="del-mbx-manual")
+        member, member_client, _ = _create_user_with_calendar(org, "member-dmm")
+        sharee, sharee_client, _ = _create_user_with_calendar(org, "sharee-dmm")
+        mailbox_email = "team@del-mbx-manual.com"
+        _create_mailbox_calendar(member, mailbox_email, org)
+        before_member = _list_calendar_urls(member)
+        _sync_mailbox_acls(
+            member,
+            [
+                {
+                    "user_email": member.email,
+                    "mailbox_email": mailbox_email,
+                    "privilege": "read-write",
+                }
+            ],
+        )
+        member_uri = _find_shared_cal_uri(member, before_urls=before_member)
+        before_sharee = _list_calendar_urls(sharee)
+        _share_calendar_via_caldav(
+            member_client, member, member_uri, sharee.email, "read"
+        )
+        sharee_uri = _find_shared_cal_uri(sharee, before_urls=before_sharee)
+        assert _read_sync_managed(sharee_client, sharee.email, sharee_uri) is None
+
+        resp = _delete_calendar(sharee_client, sharee.email, sharee_uri)
+
+        assert resp.status_code == 204
+        assert _list_calendar_urls(sharee) == before_sharee
+
+
+def _setup_mailbox_members(prefix, *members):
+    """Create a mailbox calendar synced to every member.
+
+    Returns (users, mailbox_email, {member email: instance URI}). Each
+    user is a (user, client, calendar path) tuple. The members are in a
+    different organization from the mailbox. The mailbox organization
+    comes from the mailbox domain, as in ``_resolve_mailbox_org_id``.
+    """
+    org = factories.OrganizationFactory(external_id=prefix)
+    mailbox_email = f"team@{prefix}.com"
+    mailbox_org = factories.OrganizationFactory(external_id=f"{prefix}.com")
+    users = [_create_user_with_calendar(org, f"{name}-{prefix}") for name in members]
+    _create_mailbox_calendar(users[0][0], mailbox_email, mailbox_org)
+    before = {user.email: _list_calendar_urls(user) for user, _, _ in users}
+    _sync_mailbox_acls(
+        users[0][0],
+        [
+            {
+                "user_email": user.email,
+                "mailbox_email": mailbox_email,
+                "privilege": "read-write",
+            }
+            for user, _, _ in users
+        ],
+    )
+    uris = {
+        user.email: _find_shared_cal_uri(user, before_urls=before[user.email])
+        for user, _, _ in users
+    }
+    return users, mailbox_email, uris
+
+
+class TestMailboxCalendarAdminDeletion:
+    """A mailbox admin deletes a mailbox calendar for every user."""
+
+    def test_admin_delete_removes_calendar_for_every_member(self, settings):
+        """The calendar, its events and every instance go away."""
+        settings.FEATURE_MESSAGES_INTEGRATION = True
+        users, mailbox_email, uris = _setup_mailbox_members(
+            "del-mbx-admin", "admin", "member"
+        )
+        (admin, admin_client, _), (member, _, _) = users
+        admin_uri = uris[admin.email]
+        _put_event(admin_client, admin.email, admin_uri, "del-mbx-ev", "Gone")
+
+        with mock.patch("core.services.setup_service.MessagesService") as messages:
+            messages.return_value.get_user_mailboxes.return_value = [
+                {"email": mailbox_email, "role": "admin", "users": []}
+            ]
+            resp = admin_client.delete(
+                f"/api/v1.0/calendars/mailboxes/{mailbox_email}/{admin_uri}/"
+            )
+
+        assert resp.status_code == 204
+        assert not any(
+            url.rstrip("/").endswith(admin_uri) for url in _list_calendar_urls(admin)
+        )
+        assert not any(
+            url.rstrip("/").endswith(uris[member.email])
+            for url in _list_calendar_urls(member)
+        )
+
+    def test_delete_refused_for_another_mailbox(self):
+        """The internal API refuses a calendar of another mailbox."""
+        users, _, uris = _setup_mailbox_members("del-mbx-other", "admin")
+        admin = users[0][0]
+
+        resp = http.internal_request(
+            "DELETE",
+            admin,
+            f"internal-api/calendars/{uris[admin.email]}",
+            json={"mailbox_email": "other@del-mbx-other.com"},
+        )
+
+        assert resp.status_code == 403
+        assert any(
+            url.rstrip("/").endswith(uris[admin.email])
+            for url in _list_calendar_urls(admin)
+        )
+
+    def test_delete_refused_for_a_user_calendar(self):
+        """The internal API refuses a calendar that a user owns."""
+        org = factories.OrganizationFactory(external_id="del-mbx-user")
+        owner, _, cal_path = _create_user_with_calendar(org, "owner-dmu")
+        cal_id = _get_cal_id(cal_path)
+
+        resp = http.internal_request(
+            "DELETE",
+            owner,
+            f"internal-api/calendars/{cal_id}",
+            json={"mailbox_email": "team@del-mbx-user.com"},
+        )
+
+        assert resp.status_code == 400
+        assert any(
+            url.rstrip("/").endswith(cal_id) for url in _list_calendar_urls(owner)
+        )
+
+
+def _set_hidden(client, user_email, cal_uri, hidden=True, value="true"):
+    """Set or remove LS:calendar-hidden with a PROPPATCH."""
+    if hidden:
+        update = f"<D:set><D:prop><LS:calendar-hidden>{value}</LS:calendar-hidden></D:prop></D:set>"
+    else:
+        update = "<D:remove><D:prop><LS:calendar-hidden/></D:prop></D:remove>"
+    body = (
+        '<?xml version="1.0"?>'
+        '<D:propertyupdate xmlns:D="DAV:" '
+        'xmlns:LS="http://lasuite.numerique.gouv.fr/ns/">'
+        f"{update}"
+        "</D:propertyupdate>"
+    )
+    return client.generic(
+        "PROPPATCH",
+        f"/caldav/calendars/users/{user_email}/{cal_uri}/",
+        data=body,
+        content_type="application/xml",
+    )
+
+
+def _proppatch_status(resp):
+    """Return the propstat status code of a single-property PROPPATCH."""
+    assert resp.status_code == 207
+    status = ET.fromstring(resp.content).find(".//{DAV:}propstat/{DAV:}status")
+    return int(status.text.split()[1])
+
+
+def _home_listing(client, user_email, include_hidden=False):
+    """PROPFIND the calendar home through the proxy.
+
+    Returns {calendar URI: LS:calendar-hidden value or None}.
+    """
+    body = (
+        '<?xml version="1.0"?>'
+        '<D:propfind xmlns:D="DAV:" '
+        'xmlns:LS="http://lasuite.numerique.gouv.fr/ns/">'
+        "<D:prop><D:resourcetype/><LS:calendar-hidden/></D:prop>"
+        "</D:propfind>"
+    )
+    extra = {"HTTP_X_LS_INCLUDE_HIDDEN": "true"} if include_hidden else {}
+    resp = client.generic(
+        "PROPFIND",
+        f"/caldav/calendars/users/{user_email}/",
+        data=body,
+        content_type="application/xml",
+        HTTP_DEPTH="1",
+        **extra,
+    )
+    assert resp.status_code == 207
+    listing = {}
+    for response in ET.fromstring(resp.content).findall("{DAV:}response"):
+        if response.find(".//{urn:ietf:params:xml:ns:caldav}calendar") is None:
+            continue
+        uri = unquote(response.find("{DAV:}href").text).rstrip("/").rsplit("/", 1)[-1]
+        hidden = response.find(
+            ".//{http://lasuite.numerique.gouv.fr/ns/}calendar-hidden"
+        )
+        listing[uri] = hidden.text if hidden is not None else None
+    return listing
+
+
+def _freebusy_of(client, user_email, target_email):
+    """Ask for the free/busy of target_email in the next two days."""
+    dtstart = datetime.now().strftime("%Y%m%dT%H%M%SZ")
+    dtend = (datetime.now() + timedelta(days=2)).strftime("%Y%m%dT%H%M%SZ")
+    ical = (
+        "BEGIN:VCALENDAR\r\n"
+        "VERSION:2.0\r\n"
+        "PRODID:-//Test//Test//EN\r\n"
+        "METHOD:REQUEST\r\n"
+        "BEGIN:VFREEBUSY\r\n"
+        f"UID:fb-{secrets.token_hex(4)}\r\n"
+        f"DTSTART:{dtstart}\r\n"
+        f"DTEND:{dtend}\r\n"
+        f"ORGANIZER:mailto:{user_email}\r\n"
+        f"ATTENDEE:mailto:{target_email}\r\n"
+        "END:VFREEBUSY\r\n"
+        "END:VCALENDAR\r\n"
+    )
+    resp = client.generic(
+        "POST",
+        f"/caldav/calendars/users/{user_email}/outbox/",
+        data=ical,
+        content_type="text/calendar",
+    )
+    assert resp.status_code == 200, resp.content.decode()[:500]
+    return resp.content.decode()
+
+
+class TestHiddenCalendar:
+    """A user hides a calendar for themselves and keeps access."""
+
+    def test_sharee_hides_and_shows_a_shared_calendar(self):
+        """The home listing leaves the hidden calendar out.
+
+        The direct URL still works. The web app header lists it.
+        """
+        org = factories.OrganizationFactory(external_id="hide-share")
+        owner, owner_client, cal_path = _create_user_with_calendar(org, "owner-hide")
+        sharee, sharee_client, _ = _create_user_with_calendar(org, "sharee-hide")
+        cal_id = _get_cal_id(cal_path)
+        shared_uri = _instance_uri(
+            _share_and_find(owner_client, owner, cal_id, sharee, "read")
+        )
+
+        resp = _set_hidden(sharee_client, sharee.email, shared_uri)
+
+        assert _proppatch_status(resp) == 200
+        assert shared_uri not in _home_listing(sharee_client, sharee.email)
+        assert not any(
+            url.rstrip("/").endswith(shared_uri) for url in _list_calendar_urls(sharee)
+        )
+        listing = _home_listing(sharee_client, sharee.email, include_hidden=True)
+        assert listing[shared_uri] == "true"
+        assert (
+            _propfind_calendar(sharee_client, sharee.email, shared_uri).status_code
+            == 207
+        )
+        assert cal_id in _home_listing(owner_client, owner.email)
+
+        resp = _set_hidden(sharee_client, sharee.email, shared_uri, hidden=False)
+
+        assert _proppatch_status(resp) == 204
+        assert _home_listing(sharee_client, sharee.email)[shared_uri] is None
+
+    def test_owner_cannot_hide_own_calendar(self):
+        """Only a sharee instance can be hidden."""
+        org = factories.OrganizationFactory(external_id="hide-owner")
+        owner, owner_client, cal_path = _create_user_with_calendar(org, "owner-ho")
+        cal_id = _get_cal_id(cal_path)
+
+        resp = _set_hidden(owner_client, owner.email, cal_id)
+
+        assert _proppatch_status(resp) == 403
+        assert cal_id in _home_listing(owner_client, owner.email)
+
+    def test_hidden_value_must_be_true(self):
+        """Another value is refused, so the stored value is always "true"."""
+        org = factories.OrganizationFactory(external_id="hide-value")
+        owner, owner_client, cal_path = _create_user_with_calendar(org, "owner-hv")
+        sharee, sharee_client, _ = _create_user_with_calendar(org, "sharee-hv")
+        cal_id = _get_cal_id(cal_path)
+        shared_uri = _instance_uri(
+            _share_and_find(owner_client, owner, cal_id, sharee, "read")
+        )
+
+        resp = _set_hidden(sharee_client, sharee.email, shared_uri, value="false")
+
+        assert _proppatch_status(resp) == 400
+        assert shared_uri in _home_listing(sharee_client, sharee.email)
+
+    def test_hidden_mailbox_calendar_still_counts_in_free_busy(self):
+        """Hiding does not change the availability of the user."""
+        users, _, uris = _setup_mailbox_members("hide-fb", "member", "querier")
+        (member, member_client, _), (querier, querier_client, _) = users
+        cal_uri = uris[member.email]
+        opaque = (
+            '<?xml version="1.0" encoding="utf-8"?>'
+            '<D:propertyupdate xmlns:D="DAV:" '
+            'xmlns:C="urn:ietf:params:xml:ns:caldav">'
+            "<D:set><D:prop>"
+            "<C:schedule-calendar-transp><C:opaque/></C:schedule-calendar-transp>"
+            "</D:prop></D:set>"
+            "</D:propertyupdate>"
+        )
+        resp = member_client.generic(
+            "PROPPATCH",
+            f"/caldav/calendars/users/{member.email}/{cal_uri}/",
+            data=opaque,
+            content_type="application/xml",
+        )
+        assert _proppatch_status(resp) == 200
+        _put_event(member_client, member.email, cal_uri, "hide-fb-ev", "Busy")
+        before = _freebusy_of(querier_client, querier.email, member.email)
+        assert re.search(r"^FREEBUSY", before, re.MULTILINE)
+
+        assert _delete_calendar(member_client, member.email, cal_uri).status_code == 204
+
+        assert cal_uri not in _home_listing(member_client, member.email)
+        after = _freebusy_of(querier_client, querier.email, member.email)
+        assert re.search(r"^FREEBUSY", after, re.MULTILINE)
+
+    def test_other_user_cannot_hide_a_sync_managed_instance(self):
+        """The DELETE hook checks the privileges of the caller."""
+        users, _, uris = _setup_mailbox_members("hide-acl", "member", "other")
+        (member, member_client, _), (_, other_client, _) = users
+        cal_uri = uris[member.email]
+
+        resp = _delete_calendar(other_client, member.email, cal_uri)
+
+        assert resp.status_code == 403
+        assert cal_uri in _home_listing(member_client, member.email)

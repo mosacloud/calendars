@@ -1,12 +1,11 @@
 import {
+  Button,
   DropdownMenu,
   Icon,
   IconType,
   LanguagePicker,
   useResponsive,
-} from "@gouvfr-lasuite/ui-kit";
-import { GearRounded } from "@gouvfr-lasuite/ui-kit/icons";
-import { Button } from "@gouvfr-lasuite/cunningham-react";
+} from "@gouvfr-lasuite/ui-components";
 import { useAuth } from "@/features/auth/Auth";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,6 +14,8 @@ import { fetchAPI } from "@/features/api/fetchApi";
 import { Feedback } from "@/features/feedback/Feedback";
 import { Gaufre } from "@/features/ui/components/gaufre/Gaufre";
 import { AppSwitcherButton } from "@/features/ui/components/app-switcher-panel";
+import { useConfig } from "@/features/config/ConfigProvider";
+import { getPickerLanguages, getPickerOptions } from "@/features/i18n/utils";
 import { DynamicCalendarLogo } from "@/features/ui/components/logo";
 import { UserProfile } from "@/features/ui/components/user/UserProfile";
 import { FeatureFlag, useFeatureFlag } from "@/hooks/useFeatureFlag";
@@ -76,6 +77,11 @@ const ApplicationMenu = () => {
     : [];
 
   const options = [
+    {
+      label: t("settings.calendars.title"),
+      icon: <Icon name="calendar_month" type={IconType.OUTLINED} />,
+      callback: () => void navigate({ to: "/settings/calendars" }),
+    },
     ...(isAvailabilitiesEnabled
       ? [
           {
@@ -88,13 +94,11 @@ const ApplicationMenu = () => {
     ...adminOptions,
   ];
 
-  if (options.length === 0) return null;
-
   return (
     <DropdownMenu isOpen={isOpen} onOpenChange={setIsOpen} options={options}>
       <Button
         onClick={() => setIsOpen(true)}
-        icon={<GearRounded />}
+        icon={<Icon name="settings" type={IconType.OUTLINED} />}
         aria-label={t("settings.label")}
         color="brand"
         variant="tertiary"
@@ -122,7 +126,12 @@ export const HeaderRight = () => {
 
 export const LanguagePickerUserMenu = () => {
   const { i18n } = useTranslation();
+  const { config } = useConfig();
   const { user, refreshUser } = useAuth();
+  const pickerLanguages = getPickerLanguages(
+    config.LANGUAGES ?? [],
+    Object.keys(i18n.options.resources ?? {}),
+  );
   const [selectedLanguage, setSelectedLanguage] = useState(user?.language);
 
   // Sync the user's backend language into the picker state and into i18next on
@@ -138,36 +147,20 @@ export const LanguagePickerUserMenu = () => {
     }
   }, [user?.language, i18n]);
 
-  // We must set the language to lowercase because django does not use "en-US", but "en-us".
+  // The UI kit picker reads its first language, so it cannot render without one.
+  if (pickerLanguages.length === 0) return null;
 
-  const languages = [
-    {
-      label: "Français",
-      value: "fr-fr",
-      shortLabel: "FR",
-      isChecked: selectedLanguage === "fr-fr",
-    },
-    {
-      label: "English",
-      value: "en-us",
-      shortLabel: "EN",
-      isChecked: selectedLanguage === "en-us",
-    },
-    {
-      label: "Nederlands",
-      value: "nl-nl",
-      shortLabel: "NL",
-      isChecked: selectedLanguage === "nl-nl",
-    },
-    {
-      label: "Deutsch",
-      value: "de-de",
-      shortLabel: "DE",
-      isChecked: selectedLanguage === "de-de",
-    },
-  ];
+  // Use the language of the translations that i18next resolves. It can be a
+  // fallback language. If there is none, use the requested language.
+  const languages = getPickerOptions(
+    pickerLanguages,
+    selectedLanguage,
+    i18n.resolvedLanguage ?? i18n.language,
+  );
 
   const onChange = (value: string) => {
+    // Ignore a click on the option for a UI language that the config does not offer.
+    if (!pickerLanguages.some((language) => language.value === value)) return;
     setSelectedLanguage(value);
     i18n.changeLanguage(value).catch((err) => {
       console.error("Error changing language", err);

@@ -291,7 +291,7 @@ class TestRSVPConfirmView(TestCase):
     """Tests for the RSVPConfirmView (GET handler)."""
 
     def setUp(self):
-        self.factory = RequestFactory()
+        self.factory = RequestFactory(HTTP_ACCEPT_LANGUAGE="en")
         self.view = RSVPConfirmView.as_view()
 
     def test_valid_token_renders_confirm_page(self):
@@ -330,11 +330,89 @@ class TestRSVPConfirmView(TestCase):
     APP_URL="http://localhost:8931",
     API_VERSION="v1.0",
 )
+class TestRSVPPageLanguage(TestCase):
+    """The RSVP pages use the language of the attendee, then of the browser."""
+
+    def setUp(self):
+        self.view = RSVPConfirmView.as_view()
+
+    def _post(self, **headers):
+        request = RequestFactory().post(
+            "/api/v1.0/rsvp/", {"token": _make_token()}, **headers
+        )
+        with patch.object(CalDAVHTTPClient, "internal_request") as mock_internal:
+            mock_internal.return_value = _mock_resp(
+                200, {"updated": True, "summary": "Team Meeting"}
+            )
+            return self.view(request).content.decode()
+
+    def test_default_language_without_a_browser_language(self):
+        content = self._post()
+        assert 'lang="en"' in content
+        assert "Your response has been sent to the organizer." in content
+
+    @override_settings(LANGUAGE_CODE="fr-fr")
+    def test_default_language_follows_language_code(self):
+        content = self._post()
+        assert 'lang="fr"' in content
+        assert "Votre réponse a été envoyée" in content
+
+    def test_browser_language(self):
+        content = self._post(HTTP_ACCEPT_LANGUAGE="nl-NL,nl;q=0.9")
+        assert 'lang="nl"' in content
+        assert "Uw antwoord is naar de organisator gestuurd." in content
+
+    def test_default_language_for_an_unsupported_browser_language(self):
+        content = self._post(HTTP_ACCEPT_LANGUAGE="es-ES,es;q=0.9")
+        assert 'lang="en"' in content
+
+    def test_default_language_when_the_browser_refuses_a_language(self):
+        content = self._post(HTTP_ACCEPT_LANGUAGE="es,fr;q=0")
+        assert 'lang="en"' in content
+
+    def test_first_supported_browser_language(self):
+        content = self._post(HTTP_ACCEPT_LANGUAGE="es-ES,es;q=0.9,de;q=0.8")
+        assert 'lang="de"' in content
+
+    def test_attendee_language_before_browser_language(self):
+        factories.UserFactory(email="bob@example.com", language="nl-nl")
+        content = self._post(HTTP_ACCEPT_LANGUAGE="en")
+        assert 'lang="nl"' in content
+
+    def test_invalid_token_page_uses_the_browser_language(self):
+        request = RequestFactory(HTTP_ACCEPT_LANGUAGE="nl").get(
+            "/rsvp/", {"t": "bad-token"}
+        )
+        content = self.view(request).content.decode()
+        assert 'lang="nl"' in content
+
+    def test_confirm_page_uses_the_browser_language_without_attendee_language(self):
+        request = RequestFactory(HTTP_ACCEPT_LANGUAGE="nl").get(
+            "/rsvp/", {"t": _make_token()}
+        )
+        content = self.view(request).content.decode()
+        assert 'lang="nl"' in content
+
+    def test_confirm_page_uses_the_attendee_language(self):
+        factories.UserFactory(email="bob@example.com", language="fr-fr")
+        request = RequestFactory(HTTP_ACCEPT_LANGUAGE="en").get(
+            "/rsvp/", {"t": _make_token()}
+        )
+        content = self.view(request).content.decode()
+        assert "Vous avez accepté l&#x27;invitation" in content
+
+
+@override_settings(
+    CALDAV_URL="http://caldav:80",
+    CALDAV_OUTBOUND_API_KEY="test-api-key",
+    APP_URL="http://localhost:8931",
+    API_VERSION="v1.0",
+)
 class TestRSVPConfirmViewPost(TestCase):
     """Tests for the RSVPConfirmView POST handler."""
 
     def setUp(self):
-        self.factory = RequestFactory()
+        self.factory = RequestFactory(HTTP_ACCEPT_LANGUAGE="en")
         self.view = RSVPConfirmView.as_view()
         # RSVP view looks up organizer from DB
         self.organizer = factories.UserFactory(email="alice@example.com")
@@ -418,7 +496,21 @@ class TestRSVPConfirmViewPost(TestCase):
         response = self._post(token)
 
         assert response.status_code == 400
-        assert "not found" in response.content.decode().lower()
+        assert "no longer exists" in response.content.decode().lower()
+
+    @patch.object(CalDAVHTTPClient, "internal_request")
+    def test_cancelled_event_returns_400(self, mock_internal):
+        """A cancelled event shows a cancelled message, not a success page."""
+        mock_internal.return_value = _mock_resp(410, {"error": "Event cancelled"})
+
+        token = _make_token(action="accepted")
+        response = self._post(token)
+
+        assert response.status_code == 400
+        content = response.content.decode()
+        assert "Event cancelled" in content
+        assert "cancelled by the organizer" in content
+        assert "accepted the invitation" not in content
 
     @patch.object(CalDAVHTTPClient, "internal_request")
     def test_put_failure_returns_400(self, mock_internal):
@@ -625,7 +717,7 @@ class TestRSVPEndToEndFlow(TestCase):
     """
 
     def setUp(self):
-        self.factory = RequestFactory()
+        self.factory = RequestFactory(HTTP_ACCEPT_LANGUAGE="en")
         self.confirm_view = RSVPConfirmView.as_view()
         self.process_view = RSVPConfirmView.as_view()
         org = factories.OrganizationFactory(external_id="rsvp-e2e-org")
@@ -712,8 +804,8 @@ class TestRSVPEndToEndFlow(TestCase):
             alt[0] for alt in mail.outbox[0].alternatives if alt[1] == "text/html"
         )
 
-        # Find decline link by red button color (#d2212f)
-        decline_url = self._extract_rsvp_link(html_body, "#d2212f")
+        # Find decline link by its white outlined button (#ffffff)
+        decline_url = self._extract_rsvp_link(html_body, "#ffffff")
         token = self._extract_token_from_url(decline_url)
 
         with patch.object(CalDAVHTTPClient, "internal_request") as mock_internal:
@@ -738,8 +830,8 @@ class TestRSVPEndToEndFlow(TestCase):
         # Each button has a distinct color
         colors = {
             "accept": "#435de6",  # blue
-            "tentative": "#626a80",  # gray
-            "decline": "#d2212f",  # red
+            "tentative": "#eef1fa",  # light blue
+            "decline": "#ffffff",  # white, outlined
         }
         for label, color in colors.items():
             pattern = rf'<a\s+href="([^"]*)"[^>]*background-color:\s*{re.escape(color)}'
@@ -818,7 +910,7 @@ class TestRSVPRecurringTokenExpiry(TestCase):
     """
 
     def setUp(self):
-        self.factory = RequestFactory()
+        self.factory = RequestFactory(HTTP_ACCEPT_LANGUAGE="en")
         self.view = RSVPConfirmView.as_view()
         self.organizer = factories.UserFactory(email="alice@example.com")
 

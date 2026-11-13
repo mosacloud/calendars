@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 from datetime import timezone as dt_tz
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -343,7 +344,7 @@ class TestICSImportService:
 
     @patch("core.services.caldav_service.requests.Session.request")
     def test_import_invalid_ics(self, mock_post):
-        """Importing invalid ICS data should return an error from SabreDAV."""
+        """A file that SabreDAV cannot parse gives the invalid_file code."""
         mock_post.return_value = _make_sabredav_response(
             status_code=400,
         )
@@ -356,7 +357,8 @@ class TestICSImportService:
         result = service.import_events(user, caldav_path, ICS_INVALID)
 
         assert result.imported_count == 0
-        assert len(result.errors) >= 1
+        assert result.error_code == "invalid_file"
+        assert not result.errors
 
     @patch("core.services.caldav_service.requests.Session.request")
     def test_import_with_timezone(self, mock_post):
@@ -407,6 +409,37 @@ class TestICSImportService:
         assert len(result.errors) == 1
         # Only event name is exposed, not raw error details
         assert result.errors[0] == "Afternoon review"
+
+    @patch("core.services.caldav_service.requests.Session.request")
+    def test_import_unstructured_error_not_listed(self, mock_post):
+        """An error without an event has no name, so it is not in the list."""
+        mock_post.return_value = _make_sabredav_response(
+            total_events=2,
+            imported_count=1,
+            skipped_count=1,
+            errors=[{"uid": "event-1", "summary": "Standup"}, "Raw server error"],
+        )
+
+        user = factories.UserFactory()
+        caldav_path = _make_caldav_path(user)
+
+        service = ICSImportService()
+        result = service.import_events(user, caldav_path, ICS_MULTIPLE_EVENTS)
+
+        assert result.errors == ["Standup"]
+
+    @patch("core.services.caldav_service.requests.Session.request")
+    def test_import_server_error_is_unavailable(self, mock_post):
+        """A CalDAV server error other than 400 gives the unavailable code."""
+        mock_post.return_value = _make_sabredav_response(status_code=500)
+
+        user = factories.UserFactory()
+        caldav_path = _make_caldav_path(user)
+
+        service = ICSImportService()
+        result = service.import_events(user, caldav_path, ICS_MULTIPLE_EVENTS)
+
+        assert result.error_code == "unavailable"
 
     @patch("core.services.caldav_service.requests.Session.request")
     def test_import_all_day_event(self, mock_post):
@@ -560,7 +593,18 @@ class TestICSImportService:
         result = service.import_events(user, caldav_path, ICS_SINGLE_EVENT)
 
         assert result.imported_count == 0
-        assert len(result.errors) >= 1
+        assert result.error_code == "unavailable"
+        assert not result.errors
+
+    def test_import_invalid_calendar_path(self):
+        """An invalid calendar path returns a code, not an English text."""
+        user = factories.UserFactory()
+
+        service = ICSImportService()
+        result = service.import_events(user, "/not/a/calendar/", ICS_SINGLE_EVENT)
+
+        assert result.error_code == "invalid_calendar"
+        assert not result.errors
 
 
 class TestImportEventsAPI:
@@ -1284,6 +1328,81 @@ class TestImportComponentSetFilterE2E:
         )
         assert result.imported_count == 0
         assert result.skipped_count >= 150
+
+
+@pytest.mark.xdist_group("caldav")
+class TestImportSharedCalendarE2E:
+    """A sharee can import into a shared calendar only with write access."""
+
+    @staticmethod
+    def _share(owner, owner_path, sharee, privilege):
+        """Share the owner's calendar. Return the sharee's caldav_path."""
+        before = {
+            str(c.url)
+            for c in CalDAVHTTPClient().get_dav_client(sharee).principal().calendars()
+        }
+        override = "freebusy" if privilege == "freebusy" else ""
+        access = "<CS:read-write/>" if privilege == "read-write" else "<CS:read/>"
+        client = APIClient()
+        client.force_login(owner)
+        resp = client.generic(
+            "POST",
+            f"/caldav{owner_path}",
+            data=(
+                '<?xml version="1.0" encoding="utf-8"?>'
+                '<CS:share xmlns:D="DAV:" xmlns:CS="http://calendarserver.org/ns/"'
+                ' xmlns:LS="http://lasuite.numerique.gouv.fr/ns/">'
+                f"<CS:set><D:href>mailto:{sharee.email}</D:href>"
+                f"<LS:share-access>{override}</LS:share-access>{access}</CS:set>"
+                "</CS:share>"
+            ),
+            content_type="application/xml",
+        )
+        assert resp.status_code in (200, 204)
+        after = CalDAVHTTPClient().get_dav_client(sharee).principal().calendars()
+        (shared,) = [c for c in after if str(c.url) not in before]
+        path = urlparse(str(shared.url)).path
+        return path[path.index("/calendars/") :]
+
+    @pytest.mark.parametrize(
+        ("privilege", "imported"),
+        [("read", 0), ("freebusy", 0), ("read-write", 1)],
+    )
+    def test_import_into_shared_calendar(self, privilege, imported):
+        """Only a read-write sharee can add events by import."""
+        slug = privilege.replace("-", "")
+        org = factories.OrganizationFactory(external_id=f"import-share-{slug}")
+        owner, _, owner_path = _create_user_with_calendar(org, f"owner-imp-{slug}")
+        sharee = factories.UserFactory(
+            email=f"sharee-imp-{slug}@norm-test.com", organization=org
+        )
+        sharee_path = self._share(owner, owner_path, sharee, privilege)
+
+        with patch.object(
+            ICSImportService,
+            "_failed_import_code",
+            wraps=ICSImportService._failed_import_code,  # pylint: disable=protected-access
+        ) as failed:
+            result = ICSImportService().import_events(
+                sharee, sharee_path, ICS_SINGLE_EVENT
+            )
+
+        assert result.imported_count == imported
+        if imported:
+            assert result.error_code is None
+            failed.assert_not_called()
+        else:
+            assert result.error_code == "unavailable"
+            (response,) = failed.call_args.args
+            assert response.status_code == 403
+            assert response.json() == {"error": "No write access to this calendar"}
+        events = CalDAVClient().get_events(
+            owner,
+            owner_path,
+            start=datetime(2026, 2, 10, tzinfo=dt_tz.utc),
+            end=datetime(2026, 2, 11, tzinfo=dt_tz.utc),
+        )
+        assert len(events) == imported
 
 
 def _create_user_with_calendar(org, email_prefix):

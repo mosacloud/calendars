@@ -4,7 +4,7 @@
  * Reuses types from ts-ics where possible to avoid duplication.
  */
 
-import type { IcsCalendar, IcsEvent, IcsAttendee } from "ts-ics";
+import type { IcsAttendee, IcsAttendeePartStatusType, IcsCalendar, IcsEvent } from "ts-ics";
 
 /** Attendee type from ts-ics */
 export type CalDavAttendee = IcsAttendee;
@@ -58,11 +58,31 @@ export type CalDavCalendar = {
    */
   mailboxEmail?: string;
   /**
+   * Whether Messages manages the access to this calendar instance.
+   * The value comes from ``LS:calendar-sync-managed``. When it is true,
+   * the server does not delete the instance. A DELETE hides it.
+   */
+  syncManaged?: boolean;
+  /**
+   * Whether the user hid this calendar. The value comes from
+   * ``LS:calendar-hidden`` on the user's own instance. A hidden calendar
+   * does not show in the web calendar. A PROPFIND on the calendar home
+   * leaves it out, so CalDAV clients do not list it and stop its
+   * reminders. A request with ``X-LS-Include-Hidden: true`` lists it.
+   * The user keeps access. Hiding does not change whether the calendar
+   * contributes to free/busy.
+   * It is not the unchecked state of the sidebar checkbox, which applies
+   * only to this browser.
+   */
+  hidden?: boolean;
+  /**
    * Sharees parsed from the ``CS:invite`` payload returned alongside
    * the standard calendar properties. The share modal reads this
    * directly instead of issuing a second PROPFIND.
    */
   sharees?: CalDavSharee[];
+  /** The user cannot add or change events in the calendar. */
+  readOnly?: boolean;
   resourcetype?: string[];
 };
 
@@ -135,6 +155,18 @@ export type EventFilter = {
 
 export type SharePrivilege = "freebusy" | "read" | "read-write" | "admin";
 
+/**
+ * A value of the ``{DAV:}share-access`` property, as the XML parser gives
+ * it: the element name in camelCase.
+ */
+export enum ShareAccess {
+  SHARED_OWNER = "sharedOwner",
+  NOT_SHARED = "notShared",
+  READ = "read",
+  READ_WRITE = "readWrite",
+  NO_ACCESS = "noAccess",
+}
+
 export type ShareStatus = "pending" | "accepted" | "declined";
 
 export type CalDavSharee = {
@@ -156,17 +188,27 @@ export type CalDavShareResponse = {
 };
 
 // ============================================================================
-// Scheduling (iTIP) Types — used by respondToMeeting
+// Scheduling (iTIP) Types
 // ============================================================================
 
-export type SchedulingResponse = {
-  success: boolean;
-  responses: {
-    recipient: string;
-    status: "delivered" | "failed" | "pending";
-    error?: string;
-  }[];
+/** A reason that prevents an attendee from responding to an invitation. */
+export type RsvpBlocker = "cancelled" | "deleted" | "notAttendee";
+
+/** A response of an attendee to an invitation. */
+export type InvitationResponse = {
+  uid: string;
+  attendeeEmail: string;
+  partstat: IcsAttendeePartStatusType;
+  /**
+   * The RECURRENCE-ID of the occurrence as an instant: its original
+   * start, not the start of an override that moved it. For an all-day
+   * event, the date at midnight UTC. Omit to respond to the series.
+   */
+  occurrence?: Date;
 };
+
+/** The result of a response to an invitation. */
+export type InvitationOutcome = { kind: "responded" } | { kind: "blocked"; blocker: RsvpBlocker };
 
 // ============================================================================
 // FreeBusy Types

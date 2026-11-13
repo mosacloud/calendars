@@ -28,7 +28,9 @@ import type {
   IcsOrganizer,
   IcsDuration,
 } from "ts-ics";
+import { DEFAULT_EVENT_COLOR } from "@/features/calendar/constants";
 import type { CalDavCalendar, CalDavEvent } from "./types/caldav-service";
+import { TimezoneConverter, type DateComponents } from "./helpers/timezone";
 import type {
   EventCalendarEvent,
   EventCalendarEventInput,
@@ -97,24 +99,6 @@ export function sanitizeIcsUrl(raw: string | undefined | null): string | undefin
 }
 
 // ============================================================================
-// Timezone Conversion Types
-// ============================================================================
-
-/**
- * Date components extracted from a Date in a specific timezone.
- * Used by getDateComponentsInTimezone() to convert UTC instants
- * to local time components in any IANA timezone.
- */
-export type DateComponents = {
-  year: number;
-  month: number; // 1-12 (not 0-11 like JS Date)
-  day: number;
-  hours: number;
-  minutes: number;
-  seconds: number;
-};
-
-// ============================================================================
 // Extended Types for conversion metadata
 // ============================================================================
 
@@ -173,14 +157,18 @@ export type CalDavExtendedProps = {
 
 export class EventCalendarAdapter {
   private defaultOptions: CalDavToEventCalendarOptions = {
-    defaultEventColor: "#3788d8",
+    defaultEventColor: DEFAULT_EVENT_COLOR,
     defaultTextColor: "#ffffff",
     includeRecurringInstances: true,
   };
 
   private static readonly FORMATTER_CACHE_MAX_SIZE = 50;
-  private dateComponentsFormatterCache = new Map<string, Intl.DateTimeFormat>();
   private offsetFormatterCache = new Map<string, Intl.DateTimeFormat>();
+  private readonly timezones = new TimezoneConverter();
+  // Timezones that Intl rejected for offsets. For these timezones,
+  // getTimezoneOffset uses its fallback at once. It does not call Intl
+  // again, and it logs no new warning.
+  private readonly failedOffsetTimezones = new Set<string>();
 
   // ============================================================================
   // CalDAV -> EventCalendar Conversions
@@ -483,10 +471,14 @@ export class EventCalendarAdapter {
       icsEvent.created = this.jsDateToIcsDate(extProps.created, false, timezone);
     if (extProps.recurrenceRule) icsEvent.recurrenceRule = extProps.recurrenceRule;
 
-    // Convert recurrence ID for recurring instances
+    // Convert recurrence ID for recurring instances. An all-day
+    // RECURRENCE-ID from the server is a date at midnight UTC. It stays as
+    // is: the local date of that instant is the day before west of UTC.
     if (extProps.recurrenceId) {
       icsEvent.recurrenceId = {
-        value: this.jsDateToIcsDate(extProps.recurrenceId, ecEvent.allDay ?? false, timezone),
+        value: isAllDay
+          ? { type: "DATE", date: extProps.recurrenceId }
+          : this.jsDateToIcsDate(extProps.recurrenceId, false, timezone),
       };
     }
 
@@ -867,13 +859,14 @@ export class EventCalendarAdapter {
   /**
    * Convert JavaScript Date to IcsDateObject.
    *
-   * For timed events, uses Intl.DateTimeFormat to extract the date/time
-   * components in the TARGET timezone, then creates a "fake UTC" Date
-   * where getUTCHours() etc. return those target-timezone components.
-   * This is required because ts-ics uses getUTCHours() to generate ICS output.
+   * For a timed event, the result is a "fake UTC" date: its UTC
+   * components are the wall-clock time in the target timezone. ts-ics
+   * reads the UTC components to write the ICS value. Other code, for
+   * example forms and recurrence handlers, also makes and reads fake UTC
+   * dates.
    *
-   * The fake UTC pattern is confined to this method — all other code
-   * works with real UTC dates and lets the browser handle local conversion.
+   * If Intl rejects the target timezone, the result is the real instant,
+   * without `local`. ts-ics then writes it in UTC, with a "Z" suffix.
    *
    * @param date - Any Date object (real UTC instant from icsDateToJsDate, or browser-local from EventCalendar)
    * @param allDay - Whether this is an all-day event
@@ -897,6 +890,12 @@ export class EventCalendarAdapter {
     // This correctly handles cross-timezone events (e.g., NY event viewed from Paris)
     // and DST transitions.
     const components = this.getDateComponentsInTimezone(date, tz);
+
+    // The components are UTC when Intl cannot resolve the timezone. Write
+    // the real instant in UTC, so that no TZID labels UTC wall-clock time.
+    if (this.timezones.hasFailed(tz)) {
+      return { type: "DATE-TIME", date };
+    }
 
     // Create a "fake UTC" date where UTC components = target timezone components.
     // ts-ics uses getUTCHours() to generate ICS, so this ensures correct output.
@@ -933,61 +932,51 @@ export class EventCalendarAdapter {
    * @param date - Any Date object (interpreted as a UTC instant)
    * @param timezone - IANA timezone identifier (e.g., "Europe/Paris", "America/New_York")
    * @returns DateComponents with year, month (1-12), day, hours, minutes, seconds in the target timezone
+   *
+   * If Intl rejects the timezone, returns the UTC components of the date
+   * and logs a warning. The adapter keeps the failure, so later calls for
+   * that timezone return UTC components at once, without a new warning.
    */
   public getDateComponentsInTimezone(date: Date, timezone: string): DateComponents {
-    let formatter = this.dateComponentsFormatterCache.get(timezone);
-    if (!formatter) {
-      if (this.dateComponentsFormatterCache.size >= EventCalendarAdapter.FORMATTER_CACHE_MAX_SIZE) {
-        const firstKey = this.dateComponentsFormatterCache.keys().next().value;
-        this.dateComponentsFormatterCache.delete(firstKey as string);
-      }
-      formatter = new Intl.DateTimeFormat("en-US", {
-        timeZone: timezone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      });
-      this.dateComponentsFormatterCache.set(timezone, formatter);
-    }
-    const parts = formatter.formatToParts(date);
-
-    const get = (type: Intl.DateTimeFormatPartTypes): number => {
-      const part = parts.find((p) => p.type === type);
-      return part ? parseInt(part.value, 10) : 0;
-    };
-
-    return {
-      year: get("year"),
-      month: get("month"),
-      day: get("day"),
-      hours: get("hour") === 24 ? 0 : get("hour"), // Intl may return 24 for midnight
-      minutes: get("minute"),
-      seconds: get("second"),
-    };
+    return this.timezones.getDateComponents(date, timezone);
   }
 
   /**
-   * Get timezone offset string for a date and timezone
-   * Returns format like "+0200" or "-0500"
+   * Get the UTC offset of a timezone at a date, as "+0200" or "-0500".
+   *
+   * Returns "+0000" when Intl gives no offset. If Intl rejects the
+   * timezone, also logs a warning. The adapter keeps the failure, so
+   * later calls for that timezone return "+0000" at once, without a new
+   * warning.
    */
   public getTimezoneOffset(date: Date, timezone: string): string {
-    try {
-      let formatter = this.offsetFormatterCache.get(timezone);
-      if (!formatter) {
-        if (this.offsetFormatterCache.size >= EventCalendarAdapter.FORMATTER_CACHE_MAX_SIZE) {
-          const firstKey = this.offsetFormatterCache.keys().next().value;
-          this.offsetFormatterCache.delete(firstKey as string);
-        }
+    if (this.failedOffsetTimezones.has(timezone)) {
+      return "+0000";
+    }
+    let formatter = this.offsetFormatterCache.get(timezone);
+    if (!formatter) {
+      if (this.offsetFormatterCache.size >= EventCalendarAdapter.FORMATTER_CACHE_MAX_SIZE) {
+        const firstKey = this.offsetFormatterCache.keys().next().value;
+        this.offsetFormatterCache.delete(firstKey as string);
+      }
+      try {
         formatter = new Intl.DateTimeFormat("en-US", {
           timeZone: timezone,
           timeZoneName: "longOffset",
         });
-        this.offsetFormatterCache.set(timezone, formatter);
+      } catch (error) {
+        // Intl can throw for an unknown timezone or for "longOffset". The
+        // "+0000" fallback moves times by the real offset, so log a warning.
+        this.failedOffsetTimezones.add(timezone);
+        console.warn(
+          `[EventCalendarAdapter] getTimezoneOffset failed for timezone "${timezone}" — falling back to +0000:`,
+          error,
+        );
+        return "+0000";
       }
+      this.offsetFormatterCache.set(timezone, formatter);
+    }
+    try {
       const parts = formatter.formatToParts(date);
       const tzPart = parts.find((p) => p.type === "timeZoneName");
 
@@ -1003,6 +992,8 @@ export class EventCalendarAdapter {
       }
       return "+0000";
     } catch {
+      // An invalid date makes formatToParts throw. The timezone is valid,
+      // so do not mark it as failed.
       return "+0000";
     }
   }

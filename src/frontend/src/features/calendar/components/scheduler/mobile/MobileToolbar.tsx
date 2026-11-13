@@ -1,15 +1,13 @@
 import { useMemo, useState, useCallback } from "react";
-import { Button } from "@gouvfr-lasuite/cunningham-react";
-import { DropdownMenu, type DropdownMenuOption } from "@gouvfr-lasuite/ui-kit";
-import { ChevronDown } from "@gouvfr-lasuite/ui-kit/icons";
+import { Button, DropdownMenu, type DropdownMenuOption } from "@gouvfr-lasuite/ui-components";
+import { ChevronDown, ChevronLeft, ChevronRight } from "@gouvfr-lasuite/ui-components/icons";
 import { useTranslation } from "react-i18next";
 import { useCalendarLocale } from "../../../hooks/useCalendarLocale";
-import { ChevronLeft, ChevronRight } from "@gouvfr-lasuite/ui-kit/icons";
 
 import type { MobileToolbarProps } from "../types";
 
-function formatMobileTitle(currentDate: Date, intlLocale: string): string {
-  return new Intl.DateTimeFormat(intlLocale, {
+function formatMobileTitle(currentDate: Date, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
     month: "long",
     year: "numeric",
   }).format(currentDate);
@@ -24,7 +22,7 @@ export const MobileToolbar = ({
   onTodayClick,
 }: MobileToolbarProps) => {
   const { t } = useTranslation();
-  const { intlLocale } = useCalendarLocale();
+  const { locale } = useCalendarLocale();
   const [isViewDropdownOpen, setIsViewDropdownOpen] = useState(false);
 
   const handleViewChange = useCallback(
@@ -66,10 +64,7 @@ export const MobileToolbar = ({
     return option?.label || t("calendar.views.mobile.oneDay");
   }, [currentView, viewOptions, t]);
 
-  const title = useMemo(
-    () => formatMobileTitle(currentDate, intlLocale),
-    [currentDate, intlLocale],
-  );
+  const title = useMemo(() => formatMobileTitle(currentDate, locale), [currentDate, locale]);
 
   return (
     <div className="mobile-toolbar">

@@ -8,6 +8,7 @@ from unittest import mock
 from xml.etree import ElementTree as ET
 
 from django.conf import settings
+from django.test import RequestFactory, override_settings
 
 import pytest
 import responses
@@ -22,6 +23,7 @@ from rest_framework.test import APIClient
 from core import enums as core_enums
 from core import factories
 from core import models as core_models
+from core.api.viewsets_caldav import CalDAVProxyView
 from core.enums import ChannelScope
 from core.models import uuid_to_urlsafe
 from core.services.caldav_service import CalDAVHTTPClient, validate_caldav_proxy_path
@@ -123,6 +125,35 @@ class TestCalDAVProxy:
         )
         assert request.headers["X-LS-User"] != malicious_email, (
             "X-LS-User should NOT use client-sent header value"
+        )
+
+    @pytest.mark.parametrize(
+        ("sent", "forwarded"),
+        [("true", "true"), ("1", None), (None, None)],
+    )
+    @responses.activate
+    def test_proxy_forwards_include_hidden_header(self, sent, forwarded):
+        """The proxy forwards X-LS-Include-Hidden only with the value "true"."""
+        user = factories.UserFactory(email="hidden@example.com")
+        client = APIClient()
+        client.force_login(user)
+        path = f"calendars/users/{user.email}/"
+        responses.add(
+            responses.Response(
+                method="PROPFIND",
+                url=f"{settings.CALDAV_URL}/caldav/{path}",
+                status=HTTP_207_MULTI_STATUS,
+                body='<?xml version="1.0"?><multistatus xmlns="DAV:"></multistatus>',
+                headers={"Content-Type": "application/xml"},
+            )
+        )
+        extra = {"HTTP_X_LS_INCLUDE_HIDDEN": sent} if sent else {}
+
+        client.generic("PROPFIND", f"/caldav/{path}", **extra)
+
+        assert len(responses.calls) == 1
+        assert (
+            responses.calls[0].request.headers.get("X-LS-Include-Hidden") == forwarded
         )
 
     def test_proxy_propfind_response_contains_prefixed_urls(self):
@@ -310,17 +341,69 @@ class TestCalDAVProxy:
         assert request.url == f"{caldav_url}/caldav/principals/users/test@example.com/"
 
     @responses.activate
-    def test_proxy_handles_options_request(self):
-        """Test that OPTIONS requests are handled for CORS."""
-        user = factories.UserFactory(email="test@example.com")
-        client = APIClient()
-        client.force_login(user)
+    def test_proxy_answers_cors_preflight_options_locally(self):
+        """OPTIONS carrying Access-Control-Request-Method is a browser CORS
+        preflight: answered by the view itself, never forwarded.
 
-        response = client.options("/caldav/")
+        The view is invoked directly because in the full middleware stack
+        CorsMiddleware intercepts preflights before they reach the view;
+        this pins the view's own fallback behavior.
+        """
+        request = RequestFactory().options(
+            "/caldav/",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="PROPFIND",
+            HTTP_ORIGIN="https://calendar.example.com",
+        )
+
+        response = CalDAVProxyView.as_view()(request)
 
         assert response.status_code == HTTP_200_OK
         assert "Access-Control-Allow-Methods" in response
         assert "PROPFIND" in response["Access-Control-Allow-Methods"]
+        assert len(responses.calls) == 0
+
+    @override_settings(CORS_ALLOWED_ORIGINS=["https://calendar.example.com"])
+    def test_cors_preflight_allows_the_include_hidden_header(self):
+        """The CORS middleware answers the browser preflight. It must allow
+        the header that lists hidden calendars, or the browser blocks the
+        PROPFIND of the calendar home."""
+        response = APIClient().options(
+            "/caldav/calendars/users/test@example.com/",
+            HTTP_ORIGIN="https://calendar.example.com",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="PROPFIND",
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS="depth, x-ls-include-hidden",
+        )
+
+        assert "x-ls-include-hidden" in response["Access-Control-Allow-Headers"]
+
+    @responses.activate
+    def test_proxy_forwards_plain_options_to_caldav_server(self):
+        """Plain OPTIONS (no preflight headers) is forwarded so CalDAV
+        clients receive the DAV capability header; macOS/iOS account setup
+        aborts when `calendar-access` is missing from it."""
+        user = factories.UserFactory(email="test@example.com")
+        client = APIClient()
+        client.force_login(user)
+
+        caldav_url = settings.CALDAV_URL
+        responses.add(
+            responses.Response(
+                method="OPTIONS",
+                url=f"{caldav_url}/caldav/principals/users/test@example.com/",
+                status=HTTP_200_OK,
+                headers={
+                    "DAV": "1, 3, extended-mkcol, calendar-access",
+                    "Allow": "OPTIONS, GET, PROPFIND, REPORT",
+                },
+            )
+        )
+
+        response = client.options("/caldav/principals/users/test@example.com/")
+
+        assert response.status_code == HTTP_200_OK
+        assert len(responses.calls) == 1
+        assert "calendar-access" in response["DAV"]
+        assert "Allow" in response
 
     @pytest.mark.parametrize(
         "method",

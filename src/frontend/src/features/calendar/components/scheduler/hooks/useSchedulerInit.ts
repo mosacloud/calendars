@@ -14,6 +14,7 @@ import {
   List,
   Interaction,
 } from "@event-calendar/core";
+import { addErrorToast } from "@/features/ui/components/toaster/Toaster";
 import { useCalendarLocale } from "../../../hooks/useCalendarLocale";
 import { createEventContent, type EventContentInfo } from "../utils/eventContent";
 
@@ -83,7 +84,7 @@ export const useSchedulerInit = ({
   onEventsLoaded,
 }: UseSchedulerInitProps) => {
   const { t, i18n } = useTranslation();
-  const { calendarLocale, firstDayOfWeek, formatDayHeader } = useCalendarLocale();
+  const { locale, firstDayOfWeek, formatDayHeader } = useCalendarLocale();
 
   // Capture initial scroll time only once on first render
   const initialScrollTimeRef = useRef<string>(getCurrentTimeString());
@@ -116,6 +117,10 @@ export const useSchedulerInit = ({
   useEffect(() => {
     if (!containerRef.current || calendarRef.current || !isConnected) return;
 
+    // The fetch runs on every navigation; the fixed id keeps a single toast.
+    const notifyFetchEventsError = () =>
+      addErrorToast(t("calendar.error.fetchEvents"), { toastId: "fetch-events-error" });
+
     const ec = createCalendar(containerRef.current, [TimeGrid, DayGrid, List, Interaction], {
       // View configuration
       view: initialView,
@@ -138,10 +143,18 @@ export const useSchedulerInit = ({
           hiddenDays: [0, 6],
           firstDay: 1,
         },
+        // Month view: the global ``dayHeaderFormat`` below injects the
+        // day-of-month, which is only correct for day/week grids. In the
+        // month grid the header labels whole columns, so showing the first
+        // row's day numbers is misleading — restore the library default of
+        // weekday-only headers for this view.
+        dayGridMonth: {
+          dayHeaderFormat: { weekday: "short" },
+        },
       },
 
       // Locale & time settings
-      locale: calendarLocale,
+      locale,
       firstDay: firstDayOfWeek,
       slotDuration: "00:30",
       scrollTime: initialScrollTimeRef.current,
@@ -177,10 +190,15 @@ export const useSchedulerInit = ({
       },
 
       // Custom event content — adapts layout to event duration
-      eventContent: (info: EventContentInfo) => createEventContent(info),
+      eventContent: (info: EventContentInfo) =>
+        createEventContent(info, t("calendar.event.noTitle")),
 
       // Event display
       dayMaxEvents: true,
+      // The library writes "+N more" and "Close" in English by default.
+      moreLinkContent: ({ num }: { num: number }) => t("calendar.views.moreEvents", { count: num }),
+      buttonText: (texts: Record<string, string>) => ({ ...texts, close: t("common.close") }),
+      noEventsContent: t("calendar.views.mobile.noEvents"),
       nowIndicator: true,
 
       // Date formatting (locale-aware)
@@ -222,7 +240,11 @@ export const useSchedulerInit = ({
                 });
 
                 if (!result.success || !result.data) {
-                  console.error(`Failed to fetch events from ${calendar.url}:`, result.error);
+                  console.error(
+                    `[useSchedulerInit] Failed to fetch events from ${calendar.url} (rendering it empty):`,
+                    result.error,
+                  );
+                  notifyFetchEventsError();
                   return [];
                 }
 
@@ -284,7 +306,11 @@ export const useSchedulerInit = ({
               const allEventsArrays = await Promise.all(allEventsPromises);
               return allEventsArrays.flat() as ECEvent[];
             } catch (error) {
-              console.error("Error fetching events:", error);
+              // A thrown error discards the results of all calendars, so the
+              // view shows no events. Log it and show a toast, because an
+              // empty view can mean a failed fetch (issue #74).
+              console.error("[useSchedulerInit] Error fetching events (rendering empty):", error);
+              notifyFetchEventsError();
               return [];
             }
           },
@@ -318,7 +344,7 @@ export const useSchedulerInit = ({
   }, [
     isConnected,
     calendarUrl,
-    calendarLocale,
+    locale,
     firstDayOfWeek,
     formatDayHeader,
     caldavService,

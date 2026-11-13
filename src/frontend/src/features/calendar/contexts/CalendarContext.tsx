@@ -12,21 +12,27 @@ import { useTranslation } from "react-i18next";
 import { CalDavService } from "../services/dav/CalDavService";
 import { EventCalendarAdapter } from "../services/dav/EventCalendarAdapter";
 import { caldavServerUrl } from "../utils/DavClient";
+import { sortCalendars } from "../utils/calendar-order";
 import { addToast, ToasterItem } from "@/features/ui/components/toaster/Toaster";
 import { useAuth } from "@/features/auth/Auth";
+import { deleteMailboxCalendar as deleteMailboxCalendarApi } from "@/features/mailbox/api";
+import { setCalendarHiddenAndRefresh } from "./set-calendar-hidden";
 
 import type {
   CalDavCalendar,
   CalDavCalendarCreate,
+  CalDavCalendarUpdate,
   SharePrivilege,
 } from "../services/dav/types/caldav-service";
 import type { CalendarApi } from "../components/scheduler/types";
 
-const HIDDEN_CALENDARS_KEY = "calendar-hidden-urls";
+// The URLs of the calendars that the user unchecked in this browser. The
+// key keeps its old name, so the choices of existing users stay.
+const UNCHECKED_CALENDARS_KEY = "calendar-hidden-urls";
 
-const loadHiddenUrls = (): Set<string> => {
+const loadUncheckedCalendarUrls = (): Set<string> => {
   try {
-    const stored = localStorage.getItem(HIDDEN_CALENDARS_KEY);
+    const stored = localStorage.getItem(UNCHECKED_CALENDARS_KEY);
     if (stored) {
       return new Set(JSON.parse(stored) as string[]);
     }
@@ -36,9 +42,9 @@ const loadHiddenUrls = (): Set<string> => {
   return new Set();
 };
 
-const saveHiddenUrls = (hiddenUrls: Set<string>) => {
+const saveUncheckedCalendarUrls = (uncheckedUrls: Set<string>) => {
   try {
-    localStorage.setItem(HIDDEN_CALENDARS_KEY, JSON.stringify([...hiddenUrls]));
+    localStorage.setItem(UNCHECKED_CALENDARS_KEY, JSON.stringify([...uncheckedUrls]));
   } catch {
     // Ignore storage errors
   }
@@ -48,13 +54,16 @@ export interface CalendarContextType {
   calendarRef: React.RefObject<CalendarApi | null>;
   caldavService: CalDavService;
   adapter: EventCalendarAdapter;
+  /** The calendars that the user did not hide (see `CalDavCalendar.hidden`). */
   davCalendars: CalDavCalendar[];
-  ownedCalendars: CalDavCalendar[];
-  sharedCalendars: CalDavCalendar[];
-  // Owned then shared, each sorted by `order` — the exact order shown in
-  // the sidebar. Use this (not raw `davCalendars`) anywhere a flat,
-  // sidebar-consistent calendar list is needed (e.g. the event modal).
+  /**
+   * The calendars that the user did not hide, in the order of the
+   * sidebar. Use this, not `davCalendars`, for a list that the user sees,
+   * such as the event modal.
+   */
   orderedCalendars: CalDavCalendar[];
+  /** The calendars that the user hid (see `CalDavCalendar.hidden`). */
+  hiddenCalendars: CalDavCalendar[];
   visibleCalendarUrls: Set<string>;
   isLoading: boolean;
   isConnected: boolean;
@@ -67,17 +76,36 @@ export interface CalendarContextType {
   createCalendar: (params: CalDavCalendarCreate) => Promise<{ success: boolean; error?: string }>;
   updateCalendar: (
     calendarUrl: string,
-    params: { displayName?: string; color?: string; description?: string },
+    params: CalDavCalendarUpdate,
   ) => Promise<{ success: boolean; error?: string }>;
   deleteCalendar: (calendarUrl: string) => Promise<{ success: boolean; error?: string }>;
+  /** Deletes a mailbox calendar for every user of the mailbox. */
+  deleteMailboxCalendar: (
+    calendarUrl: string,
+    mailboxEmail: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  /**
+   * Grants or updates access for the given emails in one CalDAV request.
+   * A failed request can apply some of the changes.
+   */
   shareCalendar: (
     calendarUrl: string,
-    email: string,
+    emails: string[],
     privilege?: SharePrivilege,
-  ) => Promise<{ success: boolean; error?: string }>;
+  ) => Promise<{ success: boolean; error?: string; status?: number }>;
   moveCalendar: (
     calendarUrl: string,
     direction: "up" | "down",
+  ) => Promise<{ success: boolean; error?: string }>;
+  /**
+   * Hides the calendar for the user, or shows it again (see
+   * `CalDavCalendar.hidden`). Success means that the server accepted the
+   * change. A failed refresh after it shows its own error and keeps the
+   * last calendars, so the list can still show the old state.
+   */
+  setCalendarHidden: (
+    calendarUrl: string,
+    hidden: boolean,
   ) => Promise<{ success: boolean; error?: string }>;
   goToDate: (date: Date) => void;
 }
@@ -103,61 +131,39 @@ export const CalendarContextProvider = ({ children }: CalendarContextProviderPro
   const calendarRef = useRef<CalendarApi | null>(null);
   const caldavService = useMemo(() => new CalDavService(), []);
   const adapter = useMemo(() => new EventCalendarAdapter(), []);
-  const [davCalendars, setDavCalendars] = useState<CalDavCalendar[]>([]);
-  const davCalendarsRef = useRef<CalDavCalendar[]>([]);
-  davCalendarsRef.current = davCalendars;
+  const [allCalendars, setAllCalendars] = useState<CalDavCalendar[]>([]);
+  const allCalendarsRef = useRef<CalDavCalendar[]>([]);
+  allCalendarsRef.current = allCalendars;
   const [visibleCalendarUrls, setVisibleCalendarUrls] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  const { ownedCalendars, sharedCalendars } = useMemo(() => {
-    const homeUrl = caldavService.getAccount()?.homeUrl;
-    // Sort by `calendar-order` ascending (missing = end), tie-broken by
-    // displayName so the order is stable for never-reordered calendars.
-    const byOrder = (a: CalDavCalendar, b: CalDavCalendar) => {
-      const ao = a.order ?? Number.POSITIVE_INFINITY;
-      const bo = b.order ?? Number.POSITIVE_INFINITY;
-      if (ao !== bo) return ao - bo;
-      return a.displayName.localeCompare(b.displayName);
-    };
-    if (!homeUrl) {
-      return {
-        ownedCalendars: [...davCalendars].sort(byOrder),
-        sharedCalendars: [],
-      };
-    }
-    const owned: CalDavCalendar[] = [];
-    const shared: CalDavCalendar[] = [];
-    for (const cal of davCalendars) {
-      if (cal.url.startsWith(homeUrl)) {
-        owned.push(cal);
-      } else {
-        shared.push(cal);
-      }
-    }
-    owned.sort(byOrder);
-    shared.sort(byOrder);
-    return { ownedCalendars: owned, sharedCalendars: shared };
-  }, [davCalendars, caldavService]);
-
-  // Flat, sidebar-consistent ordering (owned then shared).
-  const orderedCalendars = useMemo(
-    () => [...ownedCalendars, ...sharedCalendars],
-    [ownedCalendars, sharedCalendars],
+  const { davCalendars, hiddenCalendars } = useMemo(
+    () => ({
+      davCalendars: allCalendars.filter((cal) => !cal.hidden),
+      hiddenCalendars: allCalendars.filter((cal) => cal.hidden),
+    }),
+    [allCalendars],
   );
 
+  const orderedCalendars = useMemo(() => sortCalendars(davCalendars), [davCalendars]);
+
+  // A failed refresh keeps the calendars of the last fetch. An empty list
+  // would show the onboarding, as if the user had no calendar.
   const refreshCalendars = useCallback(async () => {
     try {
       setIsLoading(true);
       const result = await caldavService.fetchCalendars();
       if (result.success && result.data) {
-        setDavCalendars(result.data);
-        // Compute visible = all minus hidden (new calendars default to visible)
-        const hidden = loadHiddenUrls();
+        setAllCalendars(result.data);
+        // Visible = all calendars minus the URLs that the user unchecked in
+        // this browser. New calendars are visible. This is not
+        // `CalDavCalendar.hidden`: a hidden calendar is not in davCalendars.
+        const unchecked = loadUncheckedCalendarUrls();
         setVisibleCalendarUrls(
-          new Set(result.data.map((cal) => cal.url).filter((url) => !hidden.has(url))),
+          new Set(result.data.map((cal) => cal.url).filter((url) => !unchecked.has(url))),
         );
       } else {
         console.error("Error fetching calendars:", result.error);
@@ -166,8 +172,6 @@ export const CalendarContextProvider = ({ children }: CalendarContextProviderPro
             {t("calendar.error.fetchCalendars")}
           </ToasterItem>,
         );
-        setDavCalendars([]);
-        setVisibleCalendarUrls(new Set());
       }
     } catch (error) {
       console.error("Error loading calendars:", error);
@@ -176,8 +180,6 @@ export const CalendarContextProvider = ({ children }: CalendarContextProviderPro
           {t("calendar.error.fetchCalendars")}
         </ToasterItem>,
       );
-      setDavCalendars([]);
-      setVisibleCalendarUrls(new Set());
     } finally {
       setIsLoading(false);
     }
@@ -191,11 +193,11 @@ export const CalendarContextProvider = ({ children }: CalendarContextProviderPro
       } else {
         newVisible.add(calendarUrl);
       }
-      // Persist: store the hidden set (all known URLs minus visible)
-      // Use ref to avoid stale closure over davCalendars
-      const allUrls = davCalendarsRef.current.map((cal) => cal.url);
-      const newHidden = new Set(allUrls.filter((url) => !newVisible.has(url)));
-      saveHiddenUrls(newHidden);
+      // Persist: store the unchecked set (all known URLs minus visible)
+      // Use ref to avoid stale closure over allCalendars
+      const allUrls = allCalendarsRef.current.map((cal) => cal.url);
+      const newUnchecked = new Set(allUrls.filter((url) => !newVisible.has(url)));
+      saveUncheckedCalendarUrls(newUnchecked);
       return newVisible;
     });
   }, []);
@@ -226,7 +228,7 @@ export const CalendarContextProvider = ({ children }: CalendarContextProviderPro
   const updateCalendar = useCallback(
     async (
       calendarUrl: string,
-      params: { displayName?: string; color?: string; description?: string },
+      params: CalDavCalendarUpdate,
     ): Promise<{ success: boolean; error?: string }> => {
       try {
         const result = await caldavService.updateCalendar(calendarUrl, params);
@@ -249,19 +251,33 @@ export const CalendarContextProvider = ({ children }: CalendarContextProviderPro
     [caldavService, refreshCalendars],
   );
 
+  // The calendar leaves the list and the visible set first, so a failed
+  // refresh does not show it again.
+  const removeDeletedCalendar = useCallback(
+    async (calendarUrl: string) => {
+      setAllCalendars((prev) => prev.filter((calendar) => calendar.url !== calendarUrl));
+      setVisibleCalendarUrls((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(calendarUrl);
+        return newSet;
+      });
+      await refreshCalendars();
+    },
+    [refreshCalendars],
+  );
+
   const deleteCalendar = useCallback(
     async (calendarUrl: string): Promise<{ success: boolean; error?: string }> => {
       try {
         const result = await caldavService.deleteCalendar(calendarUrl);
         if (result.success) {
-          // Remove from visible calendars
-          setVisibleCalendarUrls((prev) => {
-            const newSet = new Set(prev);
-            newSet.delete(calendarUrl);
-            return newSet;
-          });
-          await refreshCalendars();
+          await removeDeletedCalendar(calendarUrl);
           return { success: true };
+        }
+        // The calendar can have become sync-managed since the last fetch.
+        // A refresh shows its delete action as disabled.
+        if (result.status === 403) {
+          await refreshCalendars();
         }
         return {
           success: false,
@@ -275,24 +291,45 @@ export const CalendarContextProvider = ({ children }: CalendarContextProviderPro
         };
       }
     },
-    [caldavService, refreshCalendars],
+    [caldavService, refreshCalendars, removeDeletedCalendar],
+  );
+
+  const deleteMailboxCalendar = useCallback(
+    async (
+      calendarUrl: string,
+      mailboxEmail: string,
+    ): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const calendarUri = decodeURIComponent(
+          calendarUrl.replace(/\/$/, "").split("/").pop() ?? "",
+        );
+        await deleteMailboxCalendarApi(mailboxEmail, calendarUri);
+      } catch (error) {
+        console.error("Error deleting mailbox calendar:", error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+      await removeDeletedCalendar(calendarUrl);
+      return { success: true };
+    },
+    [removeDeletedCalendar],
   );
 
   const shareCalendar = useCallback(
     async (
       calendarUrl: string,
-      email: string,
+      emails: string[],
       privilege: SharePrivilege = "read-write",
-    ): Promise<{ success: boolean; error?: string }> => {
+    ): Promise<{ success: boolean; error?: string; status?: number }> => {
       try {
         const result = await caldavService.shareCalendar({
           calendarUrl,
-          sharees: [
-            {
-              href: `mailto:${email}`,
-              privilege,
-            },
-          ],
+          sharees: emails.map((email) => ({
+            href: `mailto:${email}`,
+            privilege,
+          })),
         });
         if (result.success) {
           return { success: true };
@@ -300,6 +337,7 @@ export const CalendarContextProvider = ({ children }: CalendarContextProviderPro
         return {
           success: false,
           error: result.error || "Failed to share calendar",
+          status: result.status,
         };
       } catch (error) {
         console.error("Error sharing calendar:", error);
@@ -320,40 +358,34 @@ export const CalendarContextProvider = ({ children }: CalendarContextProviderPro
     ): Promise<{ success: boolean; error?: string }> => {
       // Re-entry guard: a second click while the first move's PROPPATCHes
       // and refresh are still in flight would compute against stale state
-      // (the closure captures ownedCalendars/sharedCalendars at call time)
-      // and could swap the same pair twice or assign duplicate orders.
+      // (the closure captures orderedCalendars at call time) and could
+      // swap the same pair twice or assign duplicate orders.
       if (movingRef.current) {
         return { success: false, error: "Move already in progress" };
       }
       movingRef.current = true;
       try {
-        // Pick the bucket the calendar lives in (owned vs shared). Moves
-        // are confined to the bucket the user sees on screen — the
-        // buckets render as separate sections, so cross-bucket reorder
-        // would be meaningless.
-        const bucket = ownedCalendars.some((c) => c.url === calendarUrl)
-          ? [...ownedCalendars]
-          : [...sharedCalendars];
-        const idx = bucket.findIndex((c) => c.url === calendarUrl);
+        const list = [...orderedCalendars];
+        const idx = list.findIndex((c) => c.url === calendarUrl);
         if (idx === -1) {
           return { success: false, error: "Calendar not found" };
         }
         const swapWith = direction === "up" ? idx - 1 : idx + 1;
-        if (swapWith < 0 || swapWith >= bucket.length) {
+        if (swapWith < 0 || swapWith >= list.length) {
           return { success: false, error: "Out of bounds" };
         }
-        [bucket[idx], bucket[swapWith]] = [bucket[swapWith], bucket[idx]];
+        [list[idx], list[swapWith]] = [list[swapWith], list[idx]];
 
-        // Rewrite the whole bucket as 0, 1, 2, … — small contiguous
+        // Rewrite the whole list as 0, 1, 2, and so on. Small contiguous
         // integers are the conventional values for this property, so
         // the order stays consistent if a user reorders the same
         // calendars in another CalDAV client. PROPPATCHes are skipped
         // for calendars whose value already matches, so a single swap
         // typically touches just the two moved siblings.
         const updates: Promise<{ success: boolean; error?: string }>[] = [];
-        for (let i = 0; i < bucket.length; i++) {
-          if (bucket[i].order !== i) {
-            updates.push(caldavService.updateCalendar(bucket[i].url, { order: i }));
+        for (let i = 0; i < list.length; i++) {
+          if (list[i].order !== i) {
+            updates.push(caldavService.updateCalendar(list[i].url, { order: i }));
           }
         }
         try {
@@ -382,7 +414,13 @@ export const CalendarContextProvider = ({ children }: CalendarContextProviderPro
         movingRef.current = false;
       }
     },
-    [caldavService, ownedCalendars, sharedCalendars, refreshCalendars],
+    [caldavService, orderedCalendars, refreshCalendars],
+  );
+
+  const setCalendarHidden = useCallback(
+    (calendarUrl: string, hidden: boolean) =>
+      setCalendarHiddenAndRefresh(caldavService, refreshCalendars, calendarUrl, hidden),
+    [caldavService, refreshCalendars],
   );
 
   const goToDate = useCallback((date: Date) => {
@@ -409,10 +447,12 @@ export const CalendarContextProvider = ({ children }: CalendarContextProviderPro
           // Fetch calendars after successful connection
           const calendarsResult = await caldavService.fetchCalendars();
           if (isMounted && calendarsResult.success && calendarsResult.data) {
-            setDavCalendars(calendarsResult.data);
-            const hidden = loadHiddenUrls();
+            setAllCalendars(calendarsResult.data);
+            const unchecked = loadUncheckedCalendarUrls();
             setVisibleCalendarUrls(
-              new Set(calendarsResult.data.map((cal) => cal.url).filter((url) => !hidden.has(url))),
+              new Set(
+                calendarsResult.data.map((cal) => cal.url).filter((url) => !unchecked.has(url)),
+              ),
             );
           }
           setIsLoading(false);
@@ -453,9 +493,8 @@ export const CalendarContextProvider = ({ children }: CalendarContextProviderPro
     caldavService,
     adapter,
     davCalendars,
-    ownedCalendars,
-    sharedCalendars,
     orderedCalendars,
+    hiddenCalendars,
     visibleCalendarUrls,
     isLoading,
     isConnected,
@@ -468,8 +507,10 @@ export const CalendarContextProvider = ({ children }: CalendarContextProviderPro
     createCalendar,
     updateCalendar,
     deleteCalendar,
+    deleteMailboxCalendar,
     shareCalendar,
     moveCalendar,
+    setCalendarHidden,
     goToDate,
   };
 

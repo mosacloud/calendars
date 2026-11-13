@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "@gouvfr-lasuite/cunningham-react";
-import { Edit, Globe, Key, PlugOn, Puzzle, Trash } from "@gouvfr-lasuite/ui-kit/icons";
+import { Button } from "@gouvfr-lasuite/ui-components";
+import { Edit, Globe, Key, PlugOn, Puzzle, Trash } from "@gouvfr-lasuite/ui-components/icons";
 
+import { useCalendarLocale } from "@/features/calendar/hooks/useCalendarLocale";
 import type { Channel } from "../types";
 
 type ChannelCardProps = {
@@ -19,6 +20,7 @@ const TYPE_ICONS: Record<string, ReactNode> = {
 
 export const ChannelCard = ({ channel, onEdit, onDelete }: ChannelCardProps) => {
   const { t } = useTranslation();
+  const { formatDate } = useCalendarLocale();
 
   const typeLabel = t(`integrations.types.${channel.type}.title`, channel.type);
 
@@ -37,7 +39,7 @@ export const ChannelCard = ({ channel, onEdit, onDelete }: ChannelCardProps) => 
           {channel.last_used_at && (
             <span className="channel-card__last-used">
               {t("integrations.lastUsed", {
-                date: new Date(channel.last_used_at).toLocaleDateString(),
+                date: formatDate(channel.last_used_at),
               })}
             </span>
           )}

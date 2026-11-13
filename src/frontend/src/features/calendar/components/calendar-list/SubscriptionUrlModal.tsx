@@ -5,8 +5,8 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ErrorFilled, Warning } from "@gouvfr-lasuite/ui-kit/icons";
-import { Alert, Button, Modal, ModalSize, VariantType } from "@gouvfr-lasuite/cunningham-react";
+import { ErrorFilled, Warning } from "@gouvfr-lasuite/ui-components/icons";
+import { Alert, Button, Modal, ModalSize, VariantType } from "@gouvfr-lasuite/ui-components";
 import {
   useCreateICalFeedChannel,
   useDeleteICalFeedChannel,
@@ -100,7 +100,9 @@ export const SubscriptionUrlModal = ({
     const channelId = displayChannel?.id;
     if (!channelId) return;
     await deleteChannelMutation.mutateAsync(channelId);
-    await createChannel.mutateAsync({ caldavPath, calendarName });
+    // The modal shows a failed create only after a create attempt.
+    setHasTriedCreate(true);
+    createChannel.mutate({ caldavPath, calendarName });
   };
 
   return (

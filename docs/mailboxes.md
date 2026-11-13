@@ -30,7 +30,7 @@ exclusively via `POST /internal-api/calendars/`.
 
 **Calendars** are never auto-created. The user must go through
 `POST /api/v1.0/setup/` to create their first calendar. The frontend
-detects the absence of calendars and shows the setup modal.
+shows the setup modal when the user owns no calendar.
 
 **The Django CalDAV proxy** adds `X-LS-User: {oidc_email}` to every
 request. SabreDAV uses this to authenticate the user and scope access.
@@ -83,7 +83,7 @@ Django then:
      | `sender`      | `read-write`    |
      | `admin`       | `read-write`    |
 
-3. Calls `POST /internal-api/sync-mailbox-acls/` with `full_sync=true`
+3. Calls `POST /internal-api/sync-mailbox-acls/` with `full_sync_users` set to the user
    and the full list of desired shares. The endpoint computes a diff
    against existing `sync-managed` shares and applies minimal changes:
    - Batch-fetches all owner calendar instances in one query
@@ -102,8 +102,10 @@ No explicit address sync needed — the share IS the permission.
 
 **The source of truth for mailbox access is always the Messages API.**
 CalDAV shares tagged `sync-managed` are just a cache that gets refreshed
-on every app open. Manual shares (with a different `share_href`) are never
-touched by the sync.
+on every app open. The sync does not delete manual shares (shares
+without the `is_sync_managed` flag). When a Messages share targets the
+same user and calendar as a manual share, the sync takes over that
+share: it sets the access and the `is_sync_managed` flag.
 
 **Recurring background sync**: schedule `sync_all_mailbox_acls` via cron
 (or call the management command periodically). It iterates users with
@@ -132,7 +134,7 @@ same endpoint: `POST /api/v1.0/setup/`.
    - Her own email as a personal mailbox (`alice@company.com`, role=sender)
    - Team mailboxes (`contact@company.com`, role=admin)
    - Or nothing, if Messages integration is disabled or she has no mailboxes
-3. Frontend detects the user has no calendars → shows the creation modal
+3. Frontend detects the user owns no calendar → shows the creation modal
    in onboarding mode (`isOnboarding=true`).
 4. The modal shows a mailbox selector dropdown populated from step 2.
    If the user has no mailboxes, the selector is hidden and the user can
@@ -234,6 +236,23 @@ in `calendarinstances`. This distinguishes them from manual shares and
 allows the sync to cleanly add/update/remove its own shares without
 touching user-created ones.
 
+A user cannot delete a sync-managed instance, because the next sync
+would create it again. A `DELETE` of the user's own instance hides the
+calendar instead and returns 204 (see
+[hidden-calendars.md](hidden-calendars.md)).
+CalDAV clients send this `DELETE` when the user deletes the calendar.
+`MailboxPlugin` refuses a `MOVE` or `COPY` that would replace the
+instance. To remove the access, remove the user from the mailbox in
+Messages. These instances expose `LS:calendar-sync-managed`. The web app
+then offers "Hide this calendar" instead of a delete action. Manual
+shares do not have it.
+
+A mailbox admin can delete a mailbox calendar for every user with
+`DELETE /api/v1.0/calendars/mailboxes/{mailbox_email}/{calendar_uri}/`.
+`calendar_uri` is the URI of the admin's own instance. The calendar,
+its events and all its instances go away. The frontend shows this
+action to mailbox admins only.
+
 ### Restriction on MAILBOX calendar sharing
 
 `MailboxPlugin` enforces that native `CS:share` POST
@@ -288,6 +307,7 @@ Not accessible from the outside (blocked by Django proxy).
 | `POST` | `/internal-api/rsvp/` | Update attendee PARTSTAT by event UID |
 | `POST` | `/internal-api/resources/` | Create a resource principal |
 | `DELETE` | `/internal-api/resources/{id}` | Delete a resource principal |
+| `DELETE` | `/internal-api/calendars/{calendar_uri}` | Delete a mailbox calendar for every user |
 
 ### `POST /internal-api/calendars/` vs MKCALENDAR
 
@@ -344,6 +364,7 @@ computes diff, applies minimal writes in one transaction.
 |--------|------|------|---------|
 | `GET` | `/api/v1.0/setup/mailboxes/` | OIDC | List user's mailboxes (with users) + sync shares |
 | `POST` | `/api/v1.0/setup/` | OIDC | Create a calendar (standalone or mailbox) |
+| `DELETE` | `/api/v1.0/calendars/mailboxes/{mailbox_email}/{calendar_uri}/` | OIDC | Delete a mailbox calendar for every user (mailbox admin only) |
 
 `GET /api/v1.0/setup/mailboxes/` fetches the user's mailboxes from Messages
 (cached 5 min) and syncs CalDAV shares as a side effect. Each mailbox
@@ -390,7 +411,12 @@ user's organization as before.
 ```bash
 FEATURE_MESSAGES_INTEGRATION=true   # Feature flag
 MESSAGES_API_URL=http://messages:8000  # Messages app API URL
-MESSAGES_API_KEY=<shared-secret>      # Sent as X-Service-Auth header
+MESSAGES_API_KEY=<shared-secret>      # Sent as X-API-Key header
+MESSAGES_CHANNEL_ID=<channel-id>      # Sent as X-Channel-Id header
 ```
 
-On the Messages side, the same secret is configured as `CALENDARS_API_KEY`.
+On the Messages side, a superadmin creates a global `api_key` channel
+for Calendars. The channel needs the mailboxes read scope and the
+messages send scope. Messages shows the API key only once, at creation.
+Set the channel id as `MESSAGES_CHANNEL_ID` and the key as
+`MESSAGES_API_KEY`.

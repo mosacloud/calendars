@@ -227,15 +227,19 @@ class CalDAVProxyView(View):
         return None
 
     def dispatch(self, request, *args, **kwargs):  # noqa: PLR0912, PLR0911, PLR0915  # pylint: disable=too-many-branches,too-many-return-statements,too-many-statements,too-many-locals
-        """Forward all HTTP methods to CalDAV server."""
-        if request.method == "OPTIONS":
+        """Authenticate and forward to the CalDAV server; CORS preflights
+        and rejected requests are answered locally."""
+        if (
+            request.method == "OPTIONS"
+            and "HTTP_ACCESS_CONTROL_REQUEST_METHOD" in request.META
+        ):
             response = HttpResponse(status=200)
             response["Access-Control-Allow-Methods"] = ", ".join(
                 sorted(ALLOWED_PROXY_METHODS)
             )
             response["Access-Control-Allow-Headers"] = (
                 "Content-Type, depth, authorization, if-match, if-none-match,"
-                " prefer, destination, overwrite, x-ls-client"
+                " prefer, destination, overwrite, x-ls-client, x-ls-include-hidden"
             )
             return response
 
@@ -335,6 +339,10 @@ class CalDAVProxyView(View):
             headers["If-None-Match"] = request.META["HTTP_IF_NONE_MATCH"]
         if "HTTP_PREFER" in request.META:
             headers["Prefer"] = request.META["HTTP_PREFER"]
+        # SabreDAV leaves hidden calendars out of a calendar home listing.
+        # The web app sends this header to list them too.
+        if request.headers.get("X-LS-Include-Hidden") == "true":
+            headers["X-LS-Include-Hidden"] = "true"
         # NOTE: Destination/Overwrite forwarding below is gated on MOVE
         # specifically. If COPY is ever added to ALLOWED_PROXY_METHODS,
         # this gate must be widened to ("MOVE", "COPY") — otherwise COPY

@@ -5,14 +5,14 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { ShareModal } from "@gouvfr-lasuite/ui-kit";
-import { Alert, VariantType } from "@gouvfr-lasuite/cunningham-react";
+import { ShareModal, Alert, VariantType } from "@gouvfr-lasuite/ui-components";
 import { useCalendarContext } from "../../contexts";
 import { useAuth } from "../../../auth/Auth";
 import { useMailboxContext } from "@/features/mailbox/MailboxContext";
 import { addToast, ToasterItem } from "../../../ui/components/toaster/Toaster";
 import { fetchAPI } from "@/features/api/fetchApi";
-import { Info } from "@gouvfr-lasuite/ui-kit/icons";
+import { Info } from "@gouvfr-lasuite/ui-components/icons";
+import { getShareErrorKey, getShareeEmails } from "./utils";
 
 import type {
   CalDavCalendar,
@@ -53,7 +53,7 @@ const ROLE_KEYS: Record<string, string> = {
 
 export const CalendarShareModal = ({ isOpen, calendar, onClose }: CalendarShareModalProps) => {
   const { t } = useTranslation();
-  const { caldavService, shareCalendar } = useCalendarContext();
+  const { caldavService, shareCalendar, refreshCalendars } = useCalendarContext();
   const { user } = useAuth();
   const { availableMailboxes } = useMailboxContext();
   // ``rawSharees`` is the latest source of truth for the share list:
@@ -82,6 +82,7 @@ export const CalendarShareModal = ({ isOpen, calendar, onClose }: CalendarShareM
   }, [mailboxData]);
 
   const isMailboxAdmin = mailboxData?.role === "admin";
+  const ownerEmail = isMailbox ? mailboxEmail : user?.email;
 
   // Seed/reset the share list when the modal opens or the calendar
   // changes. The initial sharees come from ``calendar.sharees`` —
@@ -97,16 +98,17 @@ export const CalendarShareModal = ({ isOpen, calendar, onClose }: CalendarShareM
     }
   }, [isOpen, calendar]);
 
-  // Re-fetch the calendar to refresh its sharees after a mutation.
-  // ``CS:invite`` rides on the standard calendar fetch, so this is a
-  // single round-trip that keeps the modal in sync.
+  // After a mutation, refresh the sharees of the modal and the calendar
+  // list. ``CS:invite`` comes with the standard calendar fetch. The
+  // delete dialog reads the sharees from the calendar list.
   const refreshSharees = useCallback(async () => {
     if (!calendar) return;
     const result = await caldavService.fetchCalendar(calendar.url);
     if (result.success && result.data) {
       setRawSharees(result.data.sharees ?? []);
     }
-  }, [calendar, caldavService]);
+    void refreshCalendars();
+  }, [calendar, caldavService, refreshCalendars]);
 
   // Project the raw sharee list into the ShareModal's expected shape,
   // injecting the owner row at the top for non-mailbox calendars and
@@ -202,27 +204,36 @@ export const CalendarShareModal = ({ isOpen, calendar, onClose }: CalendarShareM
 
       setLoading(true);
       try {
-        const invitedUser = users[0];
+        const owner = ownerEmail?.toLowerCase();
+        const emails = getShareeEmails(users, owner);
+        if (users.some((u) => u.email.toLowerCase() === owner)) {
+          addToast(
+            <ToasterItem type="error">{t("calendar.shareCalendar.errorOwner")}</ToasterItem>,
+          );
+        }
+        if (emails.length === 0) return;
         const privilege = (
           SHARE_ROLES.includes(role as SharePrivilege) ? role : "read-write"
         ) as SharePrivilege;
-        const result = await shareCalendar(calendar.url, invitedUser.email, privilege);
+        const result = await shareCalendar(calendar.url, emails, privilege);
         if (result.success) {
           addToast(
             <ToasterItem>
               {t("calendar.shareCalendar.success", {
-                email: invitedUser.email,
+                email: emails.join(", "),
               })}
             </ToasterItem>,
           );
-          await refreshSharees();
         } else {
           addToast(
             <ToasterItem type="error">
-              {result.error || t("calendar.shareCalendar.error")}
+              {t(getShareErrorKey(result, "calendar.shareCalendar.error"))}
             </ToasterItem>,
           );
         }
+        // Refresh after both outcomes: a failed request can apply some shares
+        // (issue #140).
+        await refreshSharees();
       } catch {
         addToast(<ToasterItem type="error">{t("calendar.shareCalendar.error")}</ToasterItem>);
       } finally {
@@ -230,7 +241,7 @@ export const CalendarShareModal = ({ isOpen, calendar, onClose }: CalendarShareM
         setSearchResults([]);
       }
     },
-    [calendar, shareCalendar, refreshSharees, t],
+    [calendar, ownerEmail, shareCalendar, refreshSharees, t],
   );
 
   const handleUpdateAccess = useCallback(
@@ -257,16 +268,15 @@ export const CalendarShareModal = ({ isOpen, calendar, onClose }: CalendarShareM
           SHARE_ROLES.includes(role as SharePrivilege) ? role : "read-write"
         ) as SharePrivilege;
         const email = access.user.email;
-        const result = await shareCalendar(calendar.url, email, privilege);
-        if (result.success) {
-          await refreshSharees();
-        } else {
+        const result = await shareCalendar(calendar.url, [email], privilege);
+        if (!result.success) {
           addToast(
             <ToasterItem type="error">
-              {result.error || t("calendar.shareCalendar.error")}
+              {t(getShareErrorKey(result, "calendar.shareCalendar.error"))}
             </ToasterItem>,
           );
         }
+        await refreshSharees();
       } catch {
         addToast(<ToasterItem type="error">{t("calendar.shareCalendar.error")}</ToasterItem>);
       } finally {
@@ -298,12 +308,12 @@ export const CalendarShareModal = ({ isOpen, calendar, onClose }: CalendarShareM
         } else {
           addToast(
             <ToasterItem type="error">
-              {result.error || t("calendar.shareCalendar.error")}
+              {t(getShareErrorKey(result, "calendar.shareCalendar.errorRemove"))}
             </ToasterItem>,
           );
         }
       } catch {
-        addToast(<ToasterItem type="error">{t("calendar.shareCalendar.error")}</ToasterItem>);
+        addToast(<ToasterItem type="error">{t("calendar.shareCalendar.errorRemove")}</ToasterItem>);
       } finally {
         setLoading(false);
       }

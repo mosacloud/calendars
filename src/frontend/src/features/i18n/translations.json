@@ -9,10 +9,19 @@
         "title": "You don't have the necessary permissions to access this page.",
         "button": "Home"
       },
+      "404": {
+        "title": "This page does not exist.",
+        "button": "Home"
+      },
       "no_access": {
         "title": "Your login was successful, but this application is not available for your account.",
         "description": "If you think this is a mistake, please contact support.",
         "button": "Logout"
+      },
+      "error_screen": {
+        "title": "Something went wrong.",
+        "description": "An unexpected error occurred. Please reload the page.",
+        "reload": "Reload"
       },
       "common": {
         "back": "Back",
@@ -33,6 +42,14 @@
       "my_account": "My Account",
       "settings": {
         "label": "Settings",
+        "calendars": {
+          "title": "Calendars",
+          "description": "Edit your calendars and choose the ones you see. Hidden calendars do not appear in the calendar view or in your other calendar apps, and send no reminders. You keep your access.",
+          "noCalendar": "You have no calendar.",
+          "mobileLink": "Calendar settings",
+          "hideTooltip": "Hide this calendar here and in your other calendar apps",
+          "showTooltip": "Show this calendar again"
+        },
         "workingHours": {
           "title": "Working Hours",
           "description": "Set your available hours for scheduling",
@@ -56,7 +73,10 @@
       },
       "api": {
         "error": {
-          "unexpected": "An unexpected error occurred."
+          "unexpected": "An unexpected error occurred.",
+          "forbidden": "You do not have permission to do this.",
+          "network": "Network error. Please check your connection and try again.",
+          "fileTooLarge": "The file is too large."
         }
       },
       "home": {
@@ -64,18 +84,6 @@
         "subtitle": "A modern, open-source calendar application. Create events, invite attendees, share calendars with your team, and sync across all your devices.",
         "main_button": "Sign in",
         "more": "Learn more"
-      },
-      "mosa": {
-        "login": {
-          "page_title": "Sign in to Calendar - mosa.cloud",
-          "tagline": "Collaborate without compromise",
-          "welcome_to": "Welcome to",
-          "product_description": "Plan together, stay in sync",
-          "sign_in_button": "Sign in with your account",
-          "no_account": "Don't have an account?",
-          "contact_us": "Contact us",
-          "built_in_eu": "Built in the EU"
-        }
       },
       "feedback": {
         "button": "Give feedback",
@@ -138,7 +146,10 @@
       "calendar": {
         "error": {
           "connection": "Failed to connect to the calendar server. Please try again later.",
-          "fetchCalendars": "Failed to load calendars. Please try again later."
+          "updateEvent": "Failed to update the event. Please try again.",
+          "fetchCalendars": "Failed to load calendars. Please try again later.",
+          "fetchEvents": "Failed to load some events. Please try again later.",
+          "reorderCalendars": "The calendar order could not be saved. Please try again."
         },
         "views": {
           "day": "Day",
@@ -150,6 +161,8 @@
           "listMonth": "Month list",
           "listYear": "Year list",
           "today": "Today",
+          "moreEvents_one": "+{{count}} more",
+          "moreEvents_other": "+{{count}} more",
           "mobile": {
             "oneDay": "One day",
             "workWeek": "Work week",
@@ -168,6 +181,7 @@
           "calendar": "Calendar",
           "title": "Title",
           "titlePlaceholder": "Event title",
+          "noTitle": "(No title)",
           "location": "Location",
           "locationPlaceholder": "Location",
           "openLocation": "Open",
@@ -252,19 +266,19 @@
           "tentative": "Tentative",
           "declined": "Declined",
           "needsAction": "No response",
-          "yourResponse": "Your response",
+          "yourResponse": "Your response:",
           "cancelledNotice": "This event has been cancelled.",
           "rsvpRecurringTitle": "Respond to recurring event",
           "rsvpRecurringPrompt": "This is a recurring event. Apply your response to:"
         },
         "list": {
           "defaultCalendarName": "My calendar",
-          "myCalendars": "My calendars",
-          "sharedCalendars": "Shared calendars",
+          "title": "Calendars",
           "shared": "(shared)",
           "mailboxCalendar": "Linked to mailbox: {{email}}",
+          "sharedCalendar": "Shared with you",
           "unnamed": "Unnamed calendar",
-          "showCalendar": "Show calendar",
+          "showCalendar": "Show calendar {{name}}",
           "edit": "Edit",
           "delete": "Delete",
           "share": "Share",
@@ -272,7 +286,15 @@
           "subscription": "Subscription URL",
           "moveUp": "Move up",
           "moveDown": "Move down",
-          "options": "Options"
+          "options": "Options",
+          "leaveCalendar": "Leave calendar",
+          "deleteForMailbox": "Delete for all mailbox users",
+          "hide": "Hide this calendar",
+          "show": "Show this calendar",
+          "hiddenToast": "Calendar hidden here and in your other calendar apps.",
+          "undo": "Undo",
+          "hideError": "The calendar could not be hidden.",
+          "showAgainError": "The calendar could not be shown again."
         },
         "importEvents": {
           "title": "Import events",
@@ -280,11 +302,17 @@
           "selectFile": "Select file",
           "import": "Import",
           "resultHeader": "Import results",
-          "imported": "events imported",
-          "duplicates": "events already existed",
-          "skipped": "events skipped (unsupported format)",
+          "imported_one": "event imported",
+          "imported_other": "events imported",
+          "duplicates_one": "event already existed",
+          "duplicates_other": "events already existed",
+          "skipped_one": "event skipped (unsupported format)",
+          "skipped_other": "events skipped (unsupported format)",
           "error": "An error occurred during import. Please try again.",
-          "errorDetails": "Error details"
+          "invalidFile": "This file is not a valid calendar file (.ics).",
+          "errorDetails": "Error details",
+          "unnamedEvent": "Event without a title",
+          "fileTooLarge": "The file is too large. The maximum size is {{max}} MB."
         },
         "subscription": {
           "title": "Calendar Subscription URL",
@@ -335,6 +363,19 @@
           "on": "On",
           "after": "After",
           "occurrences": "occurrences",
+          "summary": {
+            "daily_one": "Every day",
+            "daily_other": "Every {{count}} days",
+            "weekly_one": "Every week",
+            "weekly_other": "Every {{count}} weeks",
+            "monthly_one": "Every month",
+            "monthly_other": "Every {{count}} months",
+            "yearly_one": "Every year",
+            "yearly_other": "Every {{count}} years",
+            "until": "until {{date}}",
+            "count_one": "{{count}} occurrence",
+            "count_other": "{{count}} occurrences"
+          },
           "weekdays": {
             "mo": "M",
             "tu": "T",
@@ -371,6 +412,8 @@
           "name": "Name",
           "namePlaceholder": "Calendar name",
           "nameRequired": "Name is required",
+          "error": "The calendar could not be created. Please try again.",
+          "errorMailboxRole": "You need the sender or administrator role on this mailbox to create a calendar for it.",
           "color": "Color",
           "description": "Description",
           "descriptionPlaceholder": "Calendar description (optional)",
@@ -386,7 +429,9 @@
         "onboarding": {
           "title": "Welcome! Create your first calendar",
           "description": "Choose a sending identity for your calendar. This determines which email address will be used when sending event invitations.",
-          "noMailboxesMessage": "You don't have access to any mailboxes on Messages so all invitations will be sent from the system address."
+          "noMailboxesMessage": "You don't have access to any mailboxes on Messages so all invitations will be sent from the system address.",
+          "later": "Later",
+          "sharedCalendarsHint": "A calendar is shared with you. You can use it now and create your own calendar later."
         },
         "editCalendar": {
           "title": "Edit calendar",
@@ -397,7 +442,19 @@
         "deleteCalendar": {
           "title": "Delete calendar",
           "message": "Are you sure you want to delete the calendar \"{{name}}\"? This action cannot be undone.",
-          "confirm": "Delete"
+          "confirm": "Delete",
+          "sharedWarning": "This calendar is shared. It will be deleted for every person it is shared with.",
+          "error": "The calendar could not be deleted."
+        },
+        "deleteMailboxCalendar": {
+          "title": "Delete for all mailbox users",
+          "message": "Delete \"{{name}}\" for every user of the mailbox {{email}}? The calendar and all its events are deleted for everyone. This action cannot be undone.",
+          "confirm": "Delete for everyone"
+        },
+        "leaveCalendar": {
+          "title": "Leave this calendar",
+          "message": "Leave \"{{name}}\"? You lose access to this calendar. Only its owner can share it with you again. The calendar and the access of other people do not change.",
+          "confirm": "Leave"
         },
         "shareCalendar": {
           "title": "Share calendar",
@@ -406,6 +463,11 @@
           "hint": "The person will have the same rights as you (read and write).",
           "success": "Calendar shared with {{email}}",
           "error": "Failed to share calendar",
+          "errorRemove": "Failed to remove access",
+          "errorOwner": "You cannot share a calendar with its owner.",
+          "errorForbidden": "You do not have permission to change the sharing of this calendar.",
+          "errorMailboxReadOnly": "A mailbox calendar can only be shared with read-only access. Write access is managed in Messages.",
+          "errorSyncManaged": "This person's access is managed by Messages. Change it in Messages.",
           "invalidEmail": "Please enter a valid email address",
           "syncManagedHint": "Managed by Messages.",
           "mailboxInfoAdmin": "This calendar is linked to the mailbox {{email}}. You can add read-only shares below. Write access is managed in Messages.",
@@ -474,14 +536,14 @@
           "body": "{{attendee}} has replied to your event"
         },
         "labels": {
-          "when": "When",
+          "when": "When:",
           "until": "until",
-          "location": "Location",
-          "videoConference": "Video conference",
-          "organizer": "Organizer",
+          "location": "Location:",
+          "videoConference": "Video conference:",
+          "organizer": "Organizer:",
           "attendee": "Attendee",
-          "description": "Description",
-          "wasScheduledFor": "Was scheduled for"
+          "description": "Description:",
+          "wasScheduledFor": "Was scheduled for:"
         },
         "actions": {
           "accept": "Accept",
@@ -531,7 +593,9 @@
           "invalidAction": "Invalid action.",
           "invalidToken": "This link is invalid or has expired.",
           "invalidPayload": "This link is invalid.",
-          "eventNotFound": "The event was not found. It may have been deleted.",
+          "eventNotFound": "This event no longer exists. The organizer may have cancelled it.",
+          "eventCancelled": "This event was cancelled by the organizer. Your response was not sent.",
+          "eventCancelledTitle": "Event cancelled",
           "eventPast": "This event has already passed.",
           "notAttendee": "You are not listed as an attendee of this event.",
           "updateFailed": "An error occurred while updating. Please try again.",
@@ -656,8 +720,21 @@
         "previousDay": "Previous day",
         "nextDay": "Next day",
         "noConflicts": "No conflicts",
-        "conflicts": "{{count}} conflict(s)",
+        "conflicts_one": "{{count}} conflict",
+        "conflicts_other": "{{count}} conflicts",
         "addAttendeesToSeeAvailability": "Add attendees to see availability"
+      },
+      "mosa": {
+        "login": {
+          "page_title": "Sign in to Calendar - mosa.cloud",
+          "tagline": "Collaborate without compromise",
+          "welcome_to": "Welcome to",
+          "product_description": "Plan together, stay in sync",
+          "sign_in_button": "Sign in with your account",
+          "no_account": "Don't have an account?",
+          "contact_us": "Contact us",
+          "built_in_eu": "Built in the EU"
+        }
       },
       "app_switcher": {
         "you_are_in": "YOU'RE IN",
@@ -702,23 +779,32 @@
   },
   "fr": {
     "translation": {
-      "entitlements": {
-        "can_upload": {
-          "cannot_upload": "Vous n'avez pas les droits nécessaires pour transférer des fichiers."
-        }
-      },
       "401": {
-        "title": "Connectez-vous pour accéder aux documents.",
+        "title": "Connectez-vous pour accéder à cette application.",
         "button": "Se connecter"
       },
       "403": {
         "title": "Vous n'avez pas les permissions nécessaires pour accéder à cette page.",
         "button": "Accueil"
       },
+      "404": {
+        "title": "Cette page n'existe pas.",
+        "button": "Accueil"
+      },
+      "entitlements": {
+        "can_upload": {
+          "cannot_upload": "Vous n'avez pas les droits nécessaires pour transférer des fichiers."
+        }
+      },
       "no_access": {
         "title": "Votre connexion a réussi, mais cette application n'est pas disponible pour votre compte.",
         "description": "Si vous pensez qu'il s'agit d'une erreur, veuillez contacter le support.",
         "button": "Se déconnecter"
+      },
+      "error_screen": {
+        "title": "Une erreur est survenue.",
+        "description": "Une erreur inattendue s'est produite. Veuillez recharger la page.",
+        "reload": "Recharger"
       },
       "file_download_modal": {
         "error": {
@@ -773,6 +859,14 @@
       "my_account": "Mon Compte",
       "settings": {
         "label": "Paramètres",
+        "calendars": {
+          "title": "Calendriers",
+          "description": "Modifiez vos calendriers et choisissez ceux que vous voyez. Les calendriers masqués n'apparaissent ni dans la vue calendrier ni dans vos autres applications d'agenda, et n'envoient pas de rappels. Vous gardez votre accès.",
+          "noCalendar": "Vous n'avez aucun calendrier.",
+          "mobileLink": "Paramètres des calendriers",
+          "hideTooltip": "Masquer ce calendrier ici et dans vos autres applications d'agenda",
+          "showTooltip": "Afficher à nouveau ce calendrier"
+        },
         "workingHours": {
           "title": "Heures de travail",
           "description": "Définissez vos heures de disponibilité pour la planification",
@@ -796,7 +890,10 @@
       },
       "api": {
         "error": {
-          "unexpected": "Une erreur inattendue est survenue."
+          "unexpected": "Une erreur inattendue est survenue.",
+          "forbidden": "Vous n'avez pas les droits nécessaires pour effectuer cette action.",
+          "network": "Erreur réseau. Vérifiez votre connexion et réessayez.",
+          "fileTooLarge": "Le fichier est trop volumineux."
         }
       },
       "home": {
@@ -804,18 +901,6 @@
         "subtitle": "Une application de calendrier moderne et open source. Créez des événements, invitez des participants, partagez vos calendriers avec votre équipe et synchronisez sur tous vos appareils.",
         "main_button": "Se connecter",
         "more": "En savoir plus"
-      },
-      "mosa": {
-        "login": {
-          "page_title": "Connexion à Calendar - mosa.cloud",
-          "tagline": "Collaborez sans compromis",
-          "welcome_to": "Bienvenue sur",
-          "product_description": "Planifiez ensemble, restez synchronisés",
-          "sign_in_button": "Se connecter avec votre compte",
-          "no_account": "Pas encore de compte ?",
-          "contact_us": "Contactez-nous",
-          "built_in_eu": "Conçu dans l'UE"
-        }
       },
       "feedback": {
         "button": "Faire un retour",
@@ -889,7 +974,10 @@
       "calendar": {
         "error": {
           "connection": "Impossible de se connecter au serveur de calendrier. Veuillez réessayer plus tard.",
-          "fetchCalendars": "Impossible de charger les calendriers. Veuillez réessayer plus tard."
+          "updateEvent": "Impossible de modifier l'événement. Veuillez réessayer.",
+          "fetchCalendars": "Impossible de charger les calendriers. Veuillez réessayer plus tard.",
+          "fetchEvents": "Impossible de charger certains événements. Veuillez réessayer plus tard.",
+          "reorderCalendars": "Impossible d'enregistrer l'ordre des calendriers. Veuillez réessayer."
         },
         "views": {
           "day": "Jour",
@@ -901,6 +989,8 @@
           "listMonth": "Liste mois",
           "listYear": "Liste année",
           "today": "Aujourd'hui",
+          "moreEvents_one": "+{{count}} autre",
+          "moreEvents_other": "+{{count}} autres",
           "mobile": {
             "oneDay": "Un jour",
             "workWeek": "Semaine ouvrée",
@@ -919,6 +1009,7 @@
           "calendar": "Calendrier",
           "title": "Titre",
           "titlePlaceholder": "Titre de l'événement",
+          "noTitle": "(Sans titre)",
           "location": "Lieu",
           "locationPlaceholder": "Lieu",
           "openLocation": "Ouvrir",
@@ -1003,19 +1094,19 @@
           "tentative": "Peut-être",
           "declined": "Refusé",
           "needsAction": "En attente",
-          "yourResponse": "Votre réponse",
+          "yourResponse": "Votre réponse :",
           "cancelledNotice": "Cet événement a été annulé.",
           "rsvpRecurringTitle": "Répondre à un événement récurrent",
           "rsvpRecurringPrompt": "Ceci est un événement récurrent. Appliquer votre réponse à :"
         },
         "list": {
           "defaultCalendarName": "Mon calendrier",
-          "myCalendars": "Mes calendriers",
-          "sharedCalendars": "Calendriers partagés",
+          "title": "Calendriers",
           "shared": "(partagé)",
           "unnamed": "Calendrier sans nom",
           "mailboxCalendar": "Lié à la boîte : {{email}}",
-          "showCalendar": "Afficher le calendrier",
+          "sharedCalendar": "Partagé avec vous",
+          "showCalendar": "Afficher le calendrier {{name}}",
           "edit": "Modifier",
           "delete": "Supprimer",
           "share": "Partager",
@@ -1023,7 +1114,15 @@
           "subscription": "URL d'abonnement",
           "moveUp": "Déplacer vers le haut",
           "moveDown": "Déplacer vers le bas",
-          "options": "Options"
+          "options": "Options",
+          "leaveCalendar": "Quitter le calendrier",
+          "deleteForMailbox": "Supprimer pour tous les utilisateurs de la boîte",
+          "hide": "Masquer ce calendrier",
+          "show": "Afficher ce calendrier",
+          "hiddenToast": "Calendrier masqué ici et dans vos autres applications d'agenda.",
+          "undo": "Annuler",
+          "hideError": "Impossible de masquer le calendrier.",
+          "showAgainError": "Impossible d'afficher à nouveau le calendrier."
         },
         "importEvents": {
           "title": "Importer des événements",
@@ -1031,11 +1130,17 @@
           "selectFile": "Choisir un fichier",
           "import": "Importer",
           "resultHeader": "Résultats de l'import",
-          "imported": "événements importés",
-          "duplicates": "événements existaient déjà",
-          "skipped": "événements ignorés (format non supporté)",
+          "imported_one": "événement importé",
+          "imported_other": "événements importés",
+          "duplicates_one": "événement existait déjà",
+          "duplicates_other": "événements existaient déjà",
+          "skipped_one": "événement ignoré (format non supporté)",
+          "skipped_other": "événements ignorés (format non supporté)",
           "error": "Une erreur est survenue lors de l'importation. Veuillez réessayer.",
-          "errorDetails": "Détails des erreurs"
+          "invalidFile": "Ce fichier n'est pas un fichier de calendrier valide (.ics).",
+          "errorDetails": "Détails des erreurs",
+          "unnamedEvent": "Événement sans titre",
+          "fileTooLarge": "Le fichier est trop volumineux. La taille maximale est de {{max}} Mo."
         },
         "subscription": {
           "title": "URL d'abonnement au calendrier",
@@ -1086,6 +1191,19 @@
           "on": "Le",
           "after": "Après",
           "occurrences": "occurrences",
+          "summary": {
+            "daily_one": "Tous les jours",
+            "daily_other": "Tous les {{count}} jours",
+            "weekly_one": "Chaque semaine",
+            "weekly_other": "Toutes les {{count}} semaines",
+            "monthly_one": "Tous les mois",
+            "monthly_other": "Tous les {{count}} mois",
+            "yearly_one": "Tous les ans",
+            "yearly_other": "Tous les {{count}} ans",
+            "until": "jusqu'au {{date}}",
+            "count_one": "{{count}} occurrence",
+            "count_other": "{{count}} occurrences"
+          },
           "weekdays": {
             "mo": "L",
             "tu": "M",
@@ -1122,6 +1240,8 @@
           "name": "Nom du calendrier",
           "namePlaceholder": "Nom du calendrier",
           "nameRequired": "Le nom est requis",
+          "error": "Le calendrier n'a pas pu être créé. Veuillez réessayer.",
+          "errorMailboxRole": "Vous devez avoir le rôle d'expéditeur ou d'administrateur sur cette boîte pour lui créer un calendrier.",
           "color": "Couleur",
           "description": "Description",
           "descriptionPlaceholder": "Description du calendrier (optionnel)",
@@ -1137,7 +1257,9 @@
         "onboarding": {
           "title": "Bienvenue ! Créez votre premier calendrier",
           "description": "Choisissez une identité d'envoi pour votre calendrier. Elle détermine l'adresse email utilisée pour envoyer les invitations.",
-          "noMailboxesMessage": "Vous n'avez accès à aucune boîte mail sur Messages, donc toutes les invitations seront envoyées depuis l'adresse système."
+          "noMailboxesMessage": "Vous n'avez accès à aucune boîte mail sur Messages, donc toutes les invitations seront envoyées depuis l'adresse système.",
+          "later": "Plus tard",
+          "sharedCalendarsHint": "Un calendrier est partagé avec vous. Vous pouvez l'utiliser maintenant et créer votre propre calendrier plus tard."
         },
         "editCalendar": {
           "title": "Modifier le calendrier",
@@ -1148,7 +1270,19 @@
         "deleteCalendar": {
           "title": "Supprimer le calendrier",
           "message": "Êtes-vous sûr de vouloir supprimer le calendrier \"{{name}}\" ? Cette action est irréversible.",
-          "confirm": "Supprimer"
+          "confirm": "Supprimer",
+          "sharedWarning": "Ce calendrier est partagé. Il sera supprimé pour toutes les personnes avec qui il est partagé.",
+          "error": "Impossible de supprimer le calendrier."
+        },
+        "deleteMailboxCalendar": {
+          "title": "Supprimer pour tous les utilisateurs de la boîte",
+          "message": "Supprimer \"{{name}}\" pour tous les utilisateurs de la boîte {{email}} ? Le calendrier et tous ses événements sont supprimés pour tout le monde. Cette action est irréversible.",
+          "confirm": "Supprimer pour tous"
+        },
+        "leaveCalendar": {
+          "title": "Quitter ce calendrier",
+          "message": "Quitter \"{{name}}\" ? Vous perdez l'accès à ce calendrier. Seul son propriétaire peut le partager à nouveau avec vous. Le calendrier et l'accès des autres personnes ne changent pas.",
+          "confirm": "Quitter"
         },
         "shareCalendar": {
           "title": "Partager le calendrier",
@@ -1157,6 +1291,11 @@
           "hint": "La personne aura les mêmes droits que vous (lecture et écriture).",
           "success": "Calendrier partagé avec {{email}}",
           "error": "Échec du partage du calendrier",
+          "errorRemove": "Impossible de retirer l'accès",
+          "errorOwner": "Vous ne pouvez pas partager un calendrier avec son propriétaire.",
+          "errorForbidden": "Vous n'avez pas la permission de modifier le partage de ce calendrier.",
+          "errorMailboxReadOnly": "Un calendrier de boîte ne peut être partagé qu'en lecture seule. L'accès en écriture est géré dans Messages.",
+          "errorSyncManaged": "L'accès de cette personne est géré par Messages. Modifiez-le dans Messages.",
           "invalidEmail": "Veuillez entrer une adresse email valide",
           "syncManagedHint": "Géré par Messages.",
           "mailboxInfoAdmin": "Ce calendrier est lié à la boîte {{email}}. Vous pouvez ajouter des partages en lecture seule ci-dessous. L'accès en écriture est géré dans Messages.",
@@ -1225,14 +1364,14 @@
           "body": "{{attendee}} a répondu à votre événement"
         },
         "labels": {
-          "when": "Quand",
+          "when": "Quand :",
           "until": "jusqu'au",
-          "location": "Lieu",
-          "videoConference": "Visio",
-          "organizer": "Organisateur",
+          "location": "Lieu :",
+          "videoConference": "Visio :",
+          "organizer": "Organisateur :",
           "attendee": "Participant",
-          "description": "Description",
-          "wasScheduledFor": "Était prévu le"
+          "description": "Description :",
+          "wasScheduledFor": "Était prévu le :"
         },
         "actions": {
           "accept": "Accepter",
@@ -1282,7 +1421,9 @@
           "invalidAction": "Action invalide.",
           "invalidToken": "Ce lien est invalide ou a expiré.",
           "invalidPayload": "Ce lien est invalide.",
-          "eventNotFound": "L'événement n'a pas été trouvé. Il a peut-être été supprimé.",
+          "eventNotFound": "Cet événement n'existe plus. L'organisateur l'a peut-être annulé.",
+          "eventCancelled": "Cet événement a été annulé par l'organisateur. Votre réponse n'a pas été envoyée.",
+          "eventCancelledTitle": "Événement annulé",
           "eventPast": "Cet événement est déjà passé.",
           "notAttendee": "Vous ne figurez pas parmi les participants de cet événement.",
           "updateFailed": "Une erreur est survenue lors de la mise à jour. Veuillez réessayer.",
@@ -1407,8 +1548,21 @@
         "previousDay": "Jour précédent",
         "nextDay": "Jour suivant",
         "noConflicts": "Aucun conflit",
-        "conflicts": "{{count}} conflit(s)",
+        "conflicts_one": "{{count}} conflit",
+        "conflicts_other": "{{count}} conflits",
         "addAttendeesToSeeAvailability": "Ajoutez des participants pour voir les disponibilités"
+      },
+      "mosa": {
+        "login": {
+          "page_title": "Connexion à Calendar - mosa.cloud",
+          "tagline": "Collaborez sans compromis",
+          "welcome_to": "Bienvenue sur",
+          "product_description": "Planifiez ensemble, restez synchronisés",
+          "sign_in_button": "Se connecter avec votre compte",
+          "no_account": "Pas encore de compte ?",
+          "contact_us": "Contactez-nous",
+          "built_in_eu": "Conçu dans l'UE"
+        }
       },
       "app_switcher": {
         "you_are_in": "VOUS ÊTES DANS",
@@ -1446,6 +1600,834 @@
           "commander": {
             "label": "Commander",
             "subtitle": "Admin"
+          }
+        }
+      }
+    }
+  },
+  "nl": {
+    "translation": {
+      "401": {
+        "title": "U moet ingelogd zijn om toegang te krijgen tot deze applicatie.",
+        "button": "Inloggen"
+      },
+      "403": {
+        "title": "U beschikt niet over de benodigde rechten om deze pagina te openen.",
+        "button": "Startpagina"
+      },
+      "404": {
+        "title": "Deze pagina bestaat niet.",
+        "button": "Startpagina"
+      },
+      "no_access": {
+        "title": "U bent succesvol ingelogd, maar deze applicatie is niet beschikbaar voor uw account.",
+        "description": "Als u denkt dat dit een vergissing is, neem dan contact op met de ondersteuning.",
+        "button": "Uitloggen"
+      },
+      "error_screen": {
+        "title": "Er is iets misgegaan.",
+        "description": "Er is een onverwachte fout opgetreden. Laad de pagina opnieuw.",
+        "reload": "Opnieuw laden"
+      },
+      "entitlements": {
+        "can_upload": {
+          "cannot_upload": "U heeft niet de benodigde rechten om bestanden te uploaden."
+        }
+      },
+      "file_download_modal": {
+        "error": {
+          "no_url_or_title": "Dit bestand heeft geen URL of titel."
+        },
+        "suspicious": {
+          "title": "Dit bestand is verdacht"
+        },
+        "file_too_large_to_analyze": {
+          "title": "Dit bestand is te groot om te worden gescand"
+        },
+        "analyzing": {
+          "title": "Dit bestand wordt nog steeds gescand"
+        },
+        "description": "Weet u zeker dat u dit bestand wilt downloaden?",
+        "download": "Toch downloaden",
+        "cancel": "Annuleren"
+      },
+      "file_preview": {
+        "suspicious": {
+          "title": "Verdacht bestand",
+          "description": "Dit bestand is verdacht. Het is alleen voor jou zichtbaar.",
+          "download": "Bestand downloaden"
+        },
+        "error": {
+          "title": "Er is een fout opgetreden tijdens het laden van het document.",
+          "description": "Probeer het later opnieuw."
+        },
+        "unsupported": {
+          "title": "Bestandstype niet ondersteund voor voorbeeld",
+          "description": "Om het bestand te bekijken, downloadt u het naar uw apparaat.",
+          "download": "Bestand downloaden",
+          "heic_title": "HEIC bestanden worden nog niet ondersteund voor voorbeeld."
+        }
+      },
+      "common": {
+        "back": "Terug",
+        "cancel": "Annuleren",
+        "close": "Sluiten",
+        "comingSoon": "Binnenkort beschikbaar",
+        "save": "Opslaan"
+      },
+      "clipboard": {
+        "success": "Gekopieërd naar klembord",
+        "error": "Kopiëren naar klembord mislukt"
+      },
+      "app_title": "Calendar",
+      "app_description": "Kalenderbeheer",
+      "welcome": "Welkom",
+      "logout": "Uitloggen",
+      "login": "Inloggen",
+      "my_account": "Mijn account",
+      "settings": {
+        "label": "Instellingen",
+        "calendars": {
+          "title": "Kalenders",
+          "description": "Bewerk je kalenders en kies welke je ziet. Verborgen kalenders verschijnen niet in de kalenderweergave of in je andere agenda-apps en sturen geen herinneringen. Je behoudt je toegang.",
+          "noCalendar": "Je hebt geen kalender.",
+          "mobileLink": "Kalenderinstellingen",
+          "hideTooltip": "Deze kalender hier en in je andere agenda-apps verbergen",
+          "showTooltip": "Deze kalender weer tonen"
+        },
+        "workingHours": {
+          "title": "Werkuren",
+          "description": "Stel uw beschikbare uren in voor planning",
+          "when": "Wanneer",
+          "everyMonday": "Elke maandag",
+          "everyTuesday": "Elke dinsdag",
+          "everyWednesday": "Elke woensdag",
+          "everyThursday": "Elke donderdag",
+          "everyFriday": "Elke vrijdag",
+          "everySaturday": "Elke zaterdag",
+          "everySunday": "Elke zondag",
+          "specificDate": "Specifieke datum...",
+          "start": "Start",
+          "end": "Einde",
+          "addAvailability": "Beschikbaarheid toevoegen",
+          "removeAvailability": "Verwijderen",
+          "save": "Opslaan",
+          "saved": "Werkuren opgeslagen",
+          "invalidRange": "Eindtijd moet na starttijd zijn"
+        }
+      },
+      "api": {
+        "error": {
+          "unexpected": "Er is een onverwachte fout opgetreden.",
+          "forbidden": "U hebt geen toestemming om dit te doen.",
+          "network": "Netwerkfout. Controleer uw verbinding en probeer het opnieuw.",
+          "fileTooLarge": "Het bestand is te groot."
+        }
+      },
+      "home": {
+        "title": "Organiseer je tijd, samen",
+        "subtitle": "Een moderne, open-source kalenderapplicatie. Maak evenementen, nodig deelnemers uit, deel kalenders met je team en synchroniseer op al je apparaten.",
+        "main_button": "Inloggen",
+        "more": "Meer informatie"
+      },
+      "feedback": {
+        "button": "Geef feedback",
+        "modal": {
+          "title": "Nieuwe feedback",
+          "description": "Calendars is in ontwikkeling: uw feedback telt! Kies hoe u uw ideeën wilt delen:",
+          "buttons": {
+            "form": {
+              "title": "Geef snel feedback",
+              "description": "30 seconden om ons te vertellen wat u ervan vindt of een bug te melden"
+            },
+            "tchap": {
+              "title": "Schrijf op Tchap",
+              "description": "Directe uitwisseling met ons team"
+            },
+            "visio": {
+              "title": "Praten op Videogesprek",
+              "description": "20 min voor een diepgaand gesprek"
+            }
+          }
+        }
+      },
+      "feedback_widget": {
+        "shortTitle": "Feedback?",
+        "title": "Heeft u feedback?",
+        "placeholder": "Deel hier uw feedback...",
+        "email_placeholder": "Uw e-mailadres...",
+        "submit_text": "Feedback verzenden",
+        "success_text": "Bedankt voor uw feedback!",
+        "success_text2": "Indien u vragen heeft, nemen wij spoedig contact met u op."
+      },
+      "authentication": {
+        "error": {
+          "alpha": "Deze applicatie bevindt zich in de alfa-fase en de toegang ertoe is beperkt.",
+          "user_cannot_access_app": "U heeft niet de benodigde rechten om toegang te krijgen tot deze applicatie. Neem contact op met uw beheerder."
+        }
+      },
+      "mime": {
+        "calc": "Spreadsheet",
+        "doc": "Document",
+        "image": "Afbeelding",
+        "other": "overige",
+        "pdf": "PDF",
+        "powerpoint": "Presentatie",
+        "audio": "Audio",
+        "video": "Video",
+        "archive": "Archief"
+      },
+      "roles": {
+        "administrator": "Beheerder",
+        "editor": "Redacteur",
+        "reader": "Lezer",
+        "freebusy": "Alleen beschikbaarheid",
+        "owner": "Eigenaar"
+      },
+      "time": {
+        "years_ago_one": "{{count}} jaar geleden",
+        "years_ago_other": "{{count}} jaren geleden",
+        "months_ago_one": "{{count}} maand geleden",
+        "months_ago_other": "{{count}} maanden geleden",
+        "weeks_ago_one": "{{count}} week geleden",
+        "weeks_ago_other": "{{count}} weken geleden",
+        "days_ago_one": "{{count}} dag geleden",
+        "days_ago_other": "{{count}} dagen geleden",
+        "hours_ago_one": "{{count}} uur geleden",
+        "hours_ago_other": "{{count}} uren geleden",
+        "minutes_ago_one": "{{count}} minuut geleden",
+        "minutes_ago_other": "{{count}} minuten geleden",
+        "seconds_ago": "een paar seconden geleden"
+      },
+      "calendar": {
+        "error": {
+          "connection": "Kan geen verbinding maken met de kalenderserver. Probeer het later opnieuw.",
+          "updateEvent": "Kan het evenement niet bijwerken. Probeer het opnieuw.",
+          "fetchCalendars": "Kan kalenders niet laden. Probeer het later opnieuw.",
+          "fetchEvents": "Kan sommige evenementen niet laden. Probeer het later opnieuw.",
+          "reorderCalendars": "De volgorde van de kalenders kon niet worden opgeslagen. Probeer het opnieuw."
+        },
+        "views": {
+          "day": "Dag",
+          "workWeek": "Werkweek",
+          "week": "Week",
+          "month": "Maand",
+          "listDay": "Dag lijst",
+          "listWeek": "Week lijst",
+          "listMonth": "Maand lijst",
+          "listYear": "Jaar lijst",
+          "today": "Vandaag",
+          "moreEvents_one": "+{{count}} meer",
+          "moreEvents_other": "+{{count}} meer",
+          "mobile": {
+            "oneDay": "Een dag",
+            "workWeek": "Werkweek",
+            "week": "Week",
+            "list": "Lijst",
+            "noEvents": "Geen evenementen"
+          }
+        },
+        "navigation": {
+          "previous": "Vorige",
+          "next": "Volgende"
+        },
+        "event": {
+          "createTitle": "Evenement aanmaken",
+          "editTitle": "Evenement bewerken",
+          "calendar": "Kalender",
+          "title": "Titel",
+          "titlePlaceholder": "Evenement titel",
+          "noTitle": "(Geen titel)",
+          "location": "Locatie",
+          "locationPlaceholder": "Locatie",
+          "openLocation": "Openen",
+          "description": "Beschrijving",
+          "descriptionPlaceholder": "Beschrijving",
+          "start": "Start",
+          "end": "Einde",
+          "endBeforeStart": "Eindtijd moet na starttijd zijn",
+          "allDay": "Hele dag",
+          "organizer": "Organisator",
+          "attendees": "Deelnemers",
+          "deleteConfirm": "Evenement verwijderen",
+          "deleteConfirmMessage": "Weet u zeker dat u dit evenement wilt verwijderen?",
+          "deleteRecurringPrompt": "Dit is een terugkerend evenement. Wat wilt u verwijderen?",
+          "deleteThisOccurrence": "Alleen deze gebeurtenis",
+          "deleteThisAndFuture": "Deze en toekomstige gebeurtenissen",
+          "deleteAllOccurrences": "Alle gebeurtenissen",
+          "editRecurringTitle": "Terugkerend evenement bewerken",
+          "editRecurringPrompt": "Dit is een terugkerend evenement. Wat wilt u bewerken?",
+          "editThisOccurrence": "Alleen deze gebeurtenis",
+          "editThisAndFuture": "Deze en toekomstige gebeurtenissen",
+          "editAllOccurrences": "Alle gebeurtenissen",
+          "enterChoice": "Voer uw keuze in (1, 2 of 3):",
+          "invalidChoice": "Ongeldige keuze. Voer 1, 2 of 3 in.",
+          "delete": "Verwijderen",
+          "cancel": "Annuleren",
+          "save": "Opslaan",
+          "create": "Aanmaken",
+          "sections": {
+            "addRecurrence": "Herhaling toevoegen",
+            "addLocation": "Locatie toevoegen",
+            "addVideoConference": "Meet",
+            "createVisio": "Videoconferentie toevoegen",
+            "removeVisio": "Videoconferentie verwijderen",
+            "videoLink": "Videoconferentie link",
+            "addAttendees": "Deelnemers toevoegen",
+            "addResources": "Middelen toevoegen",
+            "addDescription": "Beschrijving toevoegen",
+            "addReminder": "Herinnering toevoegen",
+            "addAttachment": "Bijlage toevoegen",
+            "moreOptions": "Meer opties",
+            "reminder_one": "herinnering",
+            "reminder_other": "herinneringen",
+            "attachment_one": "bijlage",
+            "attachment_other": "bijlagen"
+          },
+          "reminders": {
+            "5min": "5 minuten voor",
+            "15min": "15 minuten voor",
+            "30min": "30 minuten voor",
+            "1hour": "1 uur voor",
+            "1day": "1 dag voor",
+            "1week": "1 week voor"
+          },
+          "status": {
+            "label": "Status",
+            "confirmed": "Bevestigd",
+            "tentative": "Voorlopig",
+            "cancelled": "Geannuleerd"
+          },
+          "visibility": {
+            "label": "Zichtbaarheid",
+            "public": "Openbaar",
+            "publicHelp": "Iedereen met wie de agenda wordt gedeeld ziet alle details.",
+            "private": "Privé",
+            "privateHelp": "Verborgen voor personen met alleen-lezentoegang. Personen die de agenda kunnen bewerken, en iedereen die voor het evenement is uitgenodigd, zien het wel.",
+            "confidential": "Vertrouwelijk",
+            "confidentialHelp": "Personen met alleen-lezentoegang zien alleen een bezet tijdvak, zonder details. Personen die de agenda kunnen bewerken, en genodigden, zien alles."
+          },
+          "availability": {
+            "label": "Beschikbaarheid",
+            "busy": "Bezet",
+            "free": "Vrij"
+          },
+          "send": "Verzenden",
+          "invitation": "Uitnodiging",
+          "organizedBy": "Georganiseerd door",
+          "accept": "Accepteren",
+          "maybe": "Misschien",
+          "decline": "Weigeren",
+          "accepted": "Geaccepteerd",
+          "tentative": "Misschien",
+          "declined": "Geweigerd",
+          "needsAction": "Geen antwoord",
+          "yourResponse": "Uw antwoord:",
+          "cancelledNotice": "Dit evenement is geannuleerd.",
+          "rsvpRecurringTitle": "Antwoorden op terugkerend evenement",
+          "rsvpRecurringPrompt": "Dit is een terugkerend evenement. Pas uw antwoord toe op:"
+        },
+        "list": {
+          "defaultCalendarName": "Mijn kalender",
+          "title": "Kalenders",
+          "shared": "(gedeeld)",
+          "unnamed": "Naamloze kalender",
+          "mailboxCalendar": "Gekoppeld aan mailbox: {{email}}",
+          "sharedCalendar": "Met u gedeeld",
+          "showCalendar": "Kalender {{name}} tonen",
+          "edit": "Bewerken",
+          "delete": "Verwijderen",
+          "share": "Delen",
+          "import": "Evenementen importeren",
+          "subscription": "Abonnements-URL",
+          "moveUp": "Omhoog verplaatsen",
+          "moveDown": "Omlaag verplaatsen",
+          "options": "Opties",
+          "leaveCalendar": "Kalender verlaten",
+          "deleteForMailbox": "Verwijderen voor alle mailboxgebruikers",
+          "hide": "Deze kalender verbergen",
+          "show": "Deze kalender tonen",
+          "hiddenToast": "Kalender verborgen hier en in je andere agenda-apps.",
+          "undo": "Ongedaan maken",
+          "hideError": "De kalender kon niet worden verborgen.",
+          "showAgainError": "De kalender kon niet weer worden getoond."
+        },
+        "importEvents": {
+          "title": "Evenementen importeren",
+          "description": "Importeer evenementen vanuit een ICS-bestand in \"{{name}}\".",
+          "selectFile": "Bestand kiezen",
+          "import": "Importeren",
+          "resultHeader": "Importresultaten",
+          "imported_one": "evenement geïmporteerd",
+          "imported_other": "evenementen geïmporteerd",
+          "duplicates_one": "evenement bestond al",
+          "duplicates_other": "evenementen bestonden al",
+          "skipped_one": "evenement overgeslagen (niet-ondersteund formaat)",
+          "skipped_other": "evenementen overgeslagen (niet-ondersteund formaat)",
+          "error": "Er is een fout opgetreden tijdens het importeren. Probeer het opnieuw.",
+          "invalidFile": "Dit bestand is geen geldig kalenderbestand (.ics).",
+          "errorDetails": "Foutdetails",
+          "unnamedEvent": "Evenement zonder titel",
+          "fileTooLarge": "Het bestand is te groot. De maximale grootte is {{max}} MB."
+        },
+        "subscription": {
+          "title": "Kalender-abonnements-URL",
+          "description": "Gebruik deze URL om u te abonneren op \"{{name}}\" vanuit externe kalendertoepassingen (Apple Calendar, Google Calendar, Outlook, etc.).",
+          "loading": "Abonnements-URL wordt gegenereerd...",
+          "copy": "Kopiëren",
+          "copied": "Gekopieerd!",
+          "close": "Sluiten",
+          "warning": "Deze URL bevat een privétoken. Iedereen met deze link kan uw kalender-evenementen bekijken.",
+          "regenerate": "URL regenereren",
+          "regenerateConfirm": {
+            "title": "Abonnements-URL regenereren?",
+            "message": "Dit maakt de huidige URL ongeldig. Externe kalenders die de oude URL gebruiken zullen niet meer synchroniseren.",
+            "confirm": "Regenereren"
+          },
+          "error": "Genereren van abonnements-URL mislukt. Probeer het opnieuw.",
+          "errorPermission": "U heeft geen toegang tot deze kalender.",
+          "errorNetwork": "Netwerkfout. Controleer uw verbinding en probeer het opnieuw.",
+          "errorServer": "Serverfout. Probeer het later opnieuw."
+        },
+        "leftPanel": {
+          "newEvent": "Nieuw evenement"
+        },
+        "miniCalendar": {
+          "previousMonth": "Vorige maand",
+          "nextMonth": "Volgende maand",
+          "weekAbbrev": "wk"
+        },
+        "recurrence": {
+          "label": "Herhalen",
+          "none": "Niet herhalen",
+          "daily": "Dagelijks",
+          "weekly": "Wekelijks",
+          "monthly": "Maandelijks",
+          "yearly": "Jaarlijks",
+          "custom": "Aangepast...",
+          "everyLabel": "Herhaal elke",
+          "days": "dagen",
+          "weeks": "weken",
+          "months": "maanden",
+          "years": "jaren",
+          "repeatOn": "Herhaal op",
+          "repeatOnDay": "Herhaal op dag",
+          "repeatOnDate": "Herhaal op datum",
+          "dayOfMonth": "Dag",
+          "endsLabel": "Eindigt",
+          "never": "Nooit",
+          "on": "Op",
+          "after": "Na",
+          "occurrences": "keer",
+          "summary": {
+            "daily_one": "Elke dag",
+            "daily_other": "Elke {{count}} dagen",
+            "weekly_one": "Elke week",
+            "weekly_other": "Elke {{count}} weken",
+            "monthly_one": "Elke maand",
+            "monthly_other": "Elke {{count}} maanden",
+            "yearly_one": "Elk jaar",
+            "yearly_other": "Elke {{count}} jaar",
+            "until": "tot {{date}}",
+            "count_one": "{{count}} keer",
+            "count_other": "{{count}} keer"
+          },
+          "weekdays": {
+            "mo": "M",
+            "tu": "D",
+            "we": "W",
+            "th": "D",
+            "fr": "V",
+            "sa": "Z",
+            "su": "Z"
+          },
+          "monthNames": {
+            "january": "Januari",
+            "february": "Februari",
+            "march": "Maart",
+            "april": "April",
+            "may": "Mei",
+            "june": "Juni",
+            "july": "Juli",
+            "august": "Augustus",
+            "september": "September",
+            "october": "Oktober",
+            "november": "November",
+            "december": "December"
+          },
+          "warnings": {
+            "februaryMax": "Februari heeft maximaal 29 dagen",
+            "leapYear": "Deze datum (29 februari) bestaat alleen in schrikkeljaren",
+            "monthMax30": "Deze maand heeft maximaal 30 dagen",
+            "dayMax31": "Dag moet tussen 1 en 31 zijn"
+          },
+          "advancedPropertiesWarning": "Dit herhalingspatroon gebruikt geavanceerde eigenschappen die hier niet volledig bewerkt kunnen worden. Opslaan kan het patroon vereenvoudigen."
+        },
+        "createCalendar": {
+          "title": "Kalender aanmaken",
+          "name": "Naam",
+          "namePlaceholder": "Kalender naam",
+          "nameRequired": "Naam is verplicht",
+          "error": "De kalender kon niet worden aangemaakt. Probeer het opnieuw.",
+          "errorMailboxRole": "U hebt de rol afzender of beheerder nodig op deze mailbox om er een kalender voor aan te maken.",
+          "color": "Kleur",
+          "description": "Beschrijving",
+          "descriptionPlaceholder": "Kalender beschrijving (optioneel)",
+          "cancel": "Annuleren",
+          "create": "Aanmaken",
+          "defaultName": "Mijn kalender",
+          "mailbox": "Verzendidentiteit",
+          "noMailbox": "Geen (zelfstandige kalender)",
+          "noMailboxHint": "Uitnodigingen worden verzonden vanaf het systeemadres.",
+          "mailboxHint": "Uitnodigingen worden verzonden vanaf {{email}} en de kalender wordt gedeeld met alle mailboxgebruikers.",
+          "noMailboxAvailable": "Uitnodigingen worden verzonden vanaf het systeemadres."
+        },
+        "onboarding": {
+          "title": "Welkom! Maak je eerste kalender aan",
+          "description": "Kies een verzendidentiteit voor je kalender. Dit bepaalt welk e-mailadres wordt gebruikt voor het verzenden van uitnodigingen.",
+          "noMailboxesMessage": "Je hebt geen toegang tot mailboxen op Messages, dus alle uitnodigingen worden verzonden vanaf het systeemadres.",
+          "later": "Later",
+          "sharedCalendarsHint": "Er is een kalender met je gedeeld. Je kunt die nu gebruiken en later je eigen kalender aanmaken."
+        },
+        "editCalendar": {
+          "title": "Kalender bewerken",
+          "save": "Opslaan",
+          "linkedMailbox": "Gekoppeld aan mailbox {{email}}",
+          "includeInAvailability": "Opnemen in beschikbaarheid"
+        },
+        "deleteCalendar": {
+          "title": "Kalender verwijderen",
+          "message": "Weet u zeker dat u de kalender \"{{name}}\" wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
+          "confirm": "Verwijderen",
+          "sharedWarning": "Deze kalender is gedeeld. Hij wordt verwijderd voor iedereen met wie hij is gedeeld.",
+          "error": "De kalender kon niet worden verwijderd."
+        },
+        "deleteMailboxCalendar": {
+          "title": "Verwijderen voor alle mailboxgebruikers",
+          "message": "\"{{name}}\" verwijderen voor alle gebruikers van de mailbox {{email}}? De kalender en al zijn afspraken worden voor iedereen verwijderd. Deze actie kan niet ongedaan worden gemaakt.",
+          "confirm": "Voor iedereen verwijderen"
+        },
+        "leaveCalendar": {
+          "title": "Deze kalender verlaten",
+          "message": "\"{{name}}\" verlaten? U verliest de toegang tot deze kalender. Alleen de eigenaar kan hem opnieuw met u delen. De kalender en de toegang van andere personen veranderen niet.",
+          "confirm": "Verlaten"
+        },
+        "shareCalendar": {
+          "title": "Kalender delen",
+          "emailPlaceholder": "Voer e-mailadres in",
+          "share": "Delen",
+          "hint": "De persoon krijgt dezelfde rechten als u (lezen en schrijven).",
+          "success": "Kalender gedeeld met {{email}}",
+          "error": "Delen van kalender mislukt",
+          "errorRemove": "Toegang verwijderen mislukt",
+          "errorOwner": "Je kunt een kalender niet delen met de eigenaar.",
+          "errorForbidden": "Je hebt geen toestemming om het delen van deze kalender te wijzigen.",
+          "errorMailboxReadOnly": "Mailboxkalenders kunnen alleen met alleen-lezen toegang worden gedeeld. Schrijftoegang wordt beheerd in Messages.",
+          "errorSyncManaged": "De toegang van deze persoon wordt beheerd door Messages. Wijzig deze in Messages.",
+          "invalidEmail": "Voer een geldig e-mailadres in",
+          "syncManagedHint": "Beheerd door Messages.",
+          "mailboxInfoAdmin": "Deze kalender is gekoppeld aan mailbox {{email}}. Je kunt hieronder alleen-lezen toegang toevoegen. Schrijftoegang wordt beheerd in Messages.",
+          "mailboxInfoReadonly": "Deze kalender is gekoppeld aan mailbox {{email}}. Delen wordt beheerd in Messages."
+        },
+        "attendees": {
+          "label": "Deelnemers uitnodigen",
+          "placeholder": "Voer e-mailadres in en druk op Enter",
+          "add": "Toevoegen",
+          "remove": "Deelnemer verwijderen",
+          "invalidEmail": "Voer een geldig e-mailadres in",
+          "alreadyAdded": "Dit e-mailadres staat al in de lijst",
+          "cannotAddOrganizer": "U kunt uzelf niet als deelnemer toevoegen",
+          "participants": "Deelnemers",
+          "organizer": "Organisator",
+          "viewProfile": "Profiel bekijken",
+          "cannotRemoveOrganizer": "Kan organisator niet verwijderen",
+          "noResults": "Geen gebruikers gevonden",
+          "sentFrom": "Uitnodiging wordt verzonden vanaf {{email}}"
+        },
+        "resources": {
+          "placeholder": "Selecteer een middel...",
+          "remove": "Middel verwijderen"
+        },
+        "weekdaysFull": {
+          "monday": "maandag",
+          "tuesday": "dinsdag",
+          "wednesday": "woensdag",
+          "thursday": "donderdag",
+          "friday": "vrijdag",
+          "saturday": "zaterdag",
+          "sunday": "zondag"
+        }
+      },
+      "email": {
+        "subject": {
+          "invitation": "Uitnodiging: {{summary}}",
+          "update": "Bijgewerkte uitnodiging: {{summary}}",
+          "cancel": "Geannuleerd: {{summary}}",
+          "reply": "Antwoord: {{summary}}"
+        },
+        "noTitle": "(Geen titel)",
+        "allDay": "Hele dag",
+        "invitation": {
+          "title": "Uitnodiging voor evenement",
+          "heading": "Uitnodiging voor evenement",
+          "badge": "Uitnodiging voor evenement",
+          "body": "{{organizer}} nodigt u uit voor een evenement"
+        },
+        "update": {
+          "title": "Evenement bijgewerkt",
+          "heading": "Evenement bijgewerkt",
+          "badge": "UITNODIGING BIJGEWERKT",
+          "body": "{{organizer}} heeft een evenement bijgewerkt waarvoor u bent uitgenodigd"
+        },
+        "cancel": {
+          "title": "Evenement geannuleerd",
+          "heading": "Evenement geannuleerd",
+          "badge": "UITNODIGING GEANNULEERD",
+          "body": "{{organizer}} heeft dit evenement geannuleerd"
+        },
+        "reply": {
+          "title": "Antwoord op evenement",
+          "heading": "Antwoord ontvangen",
+          "badge": "Antwoord",
+          "body": "{{attendee}} heeft gereageerd op uw evenement"
+        },
+        "labels": {
+          "when": "Wanneer:",
+          "until": "tot",
+          "location": "Locatie:",
+          "videoConference": "Videoconferentie:",
+          "organizer": "Organisator:",
+          "attendee": "Deelnemer",
+          "description": "Beschrijving:",
+          "wasScheduledFor": "Was gepland op:"
+        },
+        "actions": {
+          "accept": "Accepteren",
+          "maybe": "Misschien",
+          "decline": "Weigeren"
+        },
+        "instructions": {
+          "invitation": "U kunt ook het bijgevoegde .ics-bestand openen met uw agendatoepassing.",
+          "update": "Dit evenement is bijgewerkt. U kunt ook het bijgevoegde .ics-bestand openen om uw agenda bij te werken.",
+          "cancel": "Dit evenement is geannuleerd. Open het bijgevoegde .ics-bestand om het uit uw agenda te verwijderen.",
+          "reply": "Het antwoord van de deelnemer is geregistreerd. Open het bijgevoegde .ics-bestand om uw agenda bij te werken."
+        },
+        "footer": {
+          "invitation": "Deze uitnodiging is verzonden via {{appName}}",
+          "notification": "Deze melding is verzonden via {{appName}}"
+        },
+        "replyTo": {
+          "body": "{{attendee}} heeft gereageerd op uw evenement: {{summary}}",
+          "details": "Evenementdetails",
+          "instruction": "Het antwoord van de deelnemer is geregistreerd in het bijgevoegde .ics-bestand."
+        },
+        "cancelDetails": {
+          "body": "{{organizer}} heeft het evenement geannuleerd: {{summary}}",
+          "details": "Details van het geannuleerde evenement",
+          "instruction": "Dit evenement is geannuleerd. U kunt het uit uw agenda verwijderen door het bijgevoegde .ics-bestand te openen."
+        },
+        "updateDetails": {
+          "body": "{{organizer}} heeft het evenement bijgewerkt",
+          "details": "Bijgewerkte evenementdetails"
+        },
+        "invitationDetails": {
+          "body": "{{organizer}} nodigt u uit voor een evenement",
+          "details": "Evenementdetails",
+          "respond": "Reageer op deze uitnodiging:"
+        }
+      },
+      "rsvp": {
+        "accepted": "U heeft de uitnodiging geaccepteerd",
+        "tentative": "U heeft \"misschien\" geantwoord op de uitnodiging",
+        "declined": "U heeft de uitnodiging afgewezen",
+        "processing": "Uw antwoord wordt verzonden…",
+        "responseSent": "Uw antwoord is naar de organisator gestuurd.",
+        "failed": "Het verzenden van uw antwoord is mislukt. Probeer het opnieuw.",
+        "error": {
+          "title": "Fout",
+          "invalidLink": "Ongeldige link",
+          "invalidAction": "Ongeldige actie.",
+          "invalidToken": "Deze link is ongeldig of verlopen.",
+          "invalidPayload": "Deze link is ongeldig.",
+          "eventNotFound": "Dit evenement bestaat niet meer. De organisator heeft het mogelijk geannuleerd.",
+          "eventCancelled": "Dit evenement is geannuleerd door de organisator. Uw antwoord is niet verzonden.",
+          "eventCancelledTitle": "Evenement geannuleerd",
+          "eventPast": "Dit evenement is al voorbij.",
+          "notAttendee": "U staat niet vermeld als deelnemer van dit evenement.",
+          "updateFailed": "Er is een fout opgetreden bij het bijwerken. Probeer het opnieuw.",
+          "tokenExpired": "Deze link is verlopen. Vraag de organisator om een nieuwe uitnodiging.",
+          "rateLimited": "Te veel verzoeken. Wacht even en probeer het opnieuw."
+        }
+      },
+      "resources": {
+        "title": "Middelen",
+        "description": "Vergaderruimtes en gedeelde middelen beheren.",
+        "search": "Middelen zoeken...",
+        "loading": "Middelen laden...",
+        "empty": "Er zijn nog geen middelen aangemaakt.",
+        "noResults": "Geen middelen gevonden.",
+        "types": {
+          "room": "Ruimte",
+          "resource": "Middel"
+        },
+        "filters": {
+          "all": "Alle"
+        },
+        "create": {
+          "button": "Middel toevoegen",
+          "title": "Middel aanmaken",
+          "nameLabel": "Naam",
+          "typeLabel": "Type",
+          "submit": "Aanmaken",
+          "success": "Middel succesvol aangemaakt.",
+          "error": "Middel aanmaken mislukt."
+        },
+        "delete": {
+          "button": "Verwijderen",
+          "title": "Middel verwijderen",
+          "message": "Weet u zeker dat u \"{{name}}\" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
+          "confirm": "Verwijderen",
+          "success": "Middel succesvol verwijderd.",
+          "error": "Middel verwijderen mislukt."
+        }
+      },
+      "integrations": {
+        "title": "Integraties",
+        "description": "Beheer integratiekanalen zodat externe diensten toegang hebben tot uw agenda's.",
+        "loading": "Integraties laden...",
+        "empty": "Er zijn nog geen integraties aangemaakt.",
+        "scopes": {
+          "calendars_read": "Agenda's lezen",
+          "calendars_write": "Agenda's bewerken",
+          "events_read": "Evenementen lezen",
+          "events_write": "Evenementen bewerken",
+          "edit": "Rechten bewerken",
+          "updateSuccess": "Rechten succesvol bijgewerkt.",
+          "updateError": "Rechten bijwerken mislukt."
+        },
+        "lastUsed": "Laatst gebruikt: {{date}}",
+        "create": {
+          "button": "Integratie toevoegen",
+          "title": "Integratie aanmaken",
+          "chooseType": "Kies het type integratie dat u wilt aanmaken.",
+          "nameLabel": "Naam",
+          "submit": "Aanmaken",
+          "success": "Integratie succesvol aangemaakt.",
+          "error": "Integratie aanmaken mislukt.",
+          "tokenTitle": "Integratietoken",
+          "tokenWarning": "Kopieer dit token nu. Het wordt niet meer getoond."
+        },
+        "types": {
+          "caldav": {
+            "title": "CalDAV-inloggegevens",
+            "description": "Genereer een gebruikersnaam en wachtwoord om externe agendaclients (Thunderbird, Apple Calendar, enz.) via CalDAV te verbinden."
+          },
+          "ical-feed": {
+            "title": "iCal-abonnement"
+          },
+          "webhook": {
+            "title": "Webhook",
+            "description": "Stuur evenementwijzigingen via HTTP naar een extern endpoint."
+          }
+        },
+        "delete": {
+          "button": "Verwijderen",
+          "title": "Integratie verwijderen",
+          "message": "Weet u zeker dat u \"{{name}}\" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
+          "confirm": "Verwijderen",
+          "success": "Integratie succesvol verwijderd.",
+          "error": "Integratie verwijderen mislukt."
+        },
+        "regenerate": {
+          "title": "Token opnieuw genereren",
+          "description": "Geeft een nieuw token uit. Het oude stopt onmiddellijk met werken.",
+          "button": "Opnieuw genereren",
+          "success": "Token succesvol opnieuw gegenereerd.",
+          "error": "Token opnieuw genereren mislukt.",
+          "tokenTitle": "Nieuw integratietoken",
+          "tokenWarning": "Kopieer dit nieuwe token nu. Het wordt niet meer getoond."
+        },
+        "edit": {
+          "button": "Bewerken",
+          "title": "Integratie bewerken",
+          "activeLabel": "Actief",
+          "inactiveBadge": "Uitgeschakeld",
+          "success": "Integratie succesvol bijgewerkt.",
+          "error": "Integratie bijwerken mislukt."
+        },
+        "columns": {
+          "name": "Naam",
+          "type": "Type",
+          "scopes": "Rechten",
+          "lastUsed": "Laatst gebruikt"
+        },
+        "token": {
+          "copy": "Token kopiëren",
+          "copied": "Token gekopieerd naar klembord."
+        },
+        "caldav": {
+          "serverUrl": "Server-URL",
+          "username": "Gebruikersnaam",
+          "password": "Wachtwoord"
+        }
+      },
+      "scheduling": {
+        "findATime": "Zoek een tijdstip",
+        "previousDay": "Vorige dag",
+        "nextDay": "Volgende dag",
+        "noConflicts": "Geen conflicten",
+        "conflicts_one": "{{count}} conflict",
+        "conflicts_other": "{{count}} conflicten",
+        "addAttendeesToSeeAvailability": "Voeg deelnemers toe om beschikbaarheid te zien"
+      },
+      "mosa": {
+        "login": {
+          "page_title": "Inloggen bij Calendar - mosa.cloud",
+          "tagline": "Samenwerken zonder compromis",
+          "welcome_to": "Welkom bij",
+          "product_description": "Plan samen, blijf gesynchroniseerd",
+          "sign_in_button": "Inloggen met je account",
+          "no_account": "Nog geen account?",
+          "contact_us": "Neem contact op",
+          "built_in_eu": "Gemaakt in de EU"
+        }
+      },
+      "app_switcher": {
+        "you_are_in": "JE BENT IN",
+        "jump_to": "GA NAAR",
+        "switch_app": "App wisselen",
+        "apps": {
+          "epicentre": {
+            "label": "Hub",
+            "subtitle": "Start"
+          },
+          "docs": {
+            "label": "Docs",
+            "subtitle": "Documenten"
+          },
+          "drive": {
+            "label": "Drive",
+            "subtitle": "Bestanden"
+          },
+          "meet": {
+            "label": "Meet",
+            "subtitle": "Videogesprekken"
+          },
+          "mail": {
+            "label": "Mail",
+            "subtitle": "E-mail"
+          },
+          "calendar": {
+            "label": "Calendar",
+            "subtitle": "Agenda"
+          },
+          "chat": {
+            "label": "Chat",
+            "subtitle": "Berichten"
+          },
+          "commander": {
+            "label": "Commander",
+            "subtitle": "Beheer"
           }
         }
       }
@@ -2148,752 +3130,6 @@
           "commander": {
             "label": "Commander",
             "subtitle": "Verwaltung"
-          }
-        }
-      }
-    }
-  },
-  "nl": {
-    "translation": {
-      "entitlements": {
-        "can_upload": {
-          "cannot_upload": "U heeft niet de benodigde rechten om bestanden te uploaden."
-        }
-      },
-      "401": {
-        "title": "U moet ingelogd zijn om toegang te krijgen tot de bestanden.",
-        "button": "Login"
-      },
-      "403": {
-        "title": "U beschikt niet over de benodigde rechten om dit bestand te openen.",
-        "button": "Home"
-      },
-      "file_download_modal": {
-        "error": {
-          "no_url_or_title": "Dit bestand heeft geen URL of titel."
-        },
-        "suspicious": {
-          "title": "Dit bestand is verdacht"
-        },
-        "file_too_large_to_analyze": {
-          "title": "Dit bestand is te groot om te worden gescand"
-        },
-        "analyzing": {
-          "title": "Dit bestand wordt nog steeds gescand"
-        },
-        "description": "Weet u zeker dat u dit bestand wilt downloaden?",
-        "download": "Toch downloaden",
-        "cancel": "Annuleren"
-      },
-      "file_preview": {
-        "suspicious": {
-          "title": "Verdacht bestand",
-          "description": "Dit bestand is verdacht. Het is alleen voor jou zichtbaar.",
-          "download": "Bestand downloaden"
-        },
-        "error": {
-          "title": "Er is een fout opgetreden tijdens het laden van het document.",
-          "description": "Probeer het later opnieuw."
-        },
-        "unsupported": {
-          "title": "Bestandstype niet ondersteund voor voorbeeld",
-          "description": "Om het bestand te bekijken, downloadt u het naar uw apparaat.",
-          "download": "Bestand downloaden",
-          "heic_title": "HEIC bestanden worden nog niet ondersteund voor voorbeeld."
-        }
-      },
-      "common": {
-        "back": "Terug",
-        "cancel": "Annuleren",
-        "close": "Sluiten",
-        "comingSoon": "Binnenkort beschikbaar",
-        "save": "Opslaan"
-      },
-      "clipboard": {
-        "success": "Gekopieërd naar klembord",
-        "error": "Kopiëren naar klembord mislukt"
-      },
-      "app_title": "Calendar",
-      "app_description": "Kalenderbeheer",
-      "welcome": "Welkom",
-      "logout": "Uitloggen",
-      "login": "Inloggen",
-      "my_account": "Mijn account",
-      "settings": {
-        "label": "Instellingen",
-        "workingHours": {
-          "title": "Werkuren",
-          "description": "Stel uw beschikbare uren in voor planning",
-          "when": "Wanneer",
-          "everyMonday": "Elke maandag",
-          "everyTuesday": "Elke dinsdag",
-          "everyWednesday": "Elke woensdag",
-          "everyThursday": "Elke donderdag",
-          "everyFriday": "Elke vrijdag",
-          "everySaturday": "Elke zaterdag",
-          "everySunday": "Elke zondag",
-          "specificDate": "Specifieke datum...",
-          "start": "Start",
-          "end": "Einde",
-          "addAvailability": "Beschikbaarheid toevoegen",
-          "removeAvailability": "Verwijderen",
-          "save": "Opslaan",
-          "saved": "Werkuren opgeslagen",
-          "invalidRange": "Eindtijd moet na starttijd zijn"
-        }
-      },
-      "api": {
-        "error": {
-          "unexpected": "Er is een onverwachte fout opgetreden."
-        }
-      },
-      "home": {
-        "title": "Organiseer je tijd, samen",
-        "subtitle": "Een moderne, open-source kalenderapplicatie. Maak evenementen, nodig deelnemers uit, deel kalenders met je team en synchroniseer op al je apparaten.",
-        "main_button": "Inloggen",
-        "more": "Meer informatie"
-      },
-      "mosa": {
-        "login": {
-          "page_title": "Inloggen bij Calendar - mosa.cloud",
-          "tagline": "Samenwerken zonder compromis",
-          "welcome_to": "Welkom bij",
-          "product_description": "Plan samen, blijf gesynchroniseerd",
-          "sign_in_button": "Inloggen met je account",
-          "no_account": "Nog geen account?",
-          "contact_us": "Neem contact op",
-          "built_in_eu": "Gemaakt in de EU"
-        }
-      },
-      "feedback": {
-        "button": "Geef feedback",
-        "modal": {
-          "title": "Nieuwe feedback",
-          "description": "Calendars is in ontwikkeling: uw feedback telt! Kies hoe u uw ideeën wilt delen:",
-          "buttons": {
-            "form": {
-              "title": "Geef snel feedback",
-              "description": "30 seconden om ons te vertellen wat u ervan vindt of een bug te melden"
-            },
-            "tchap": {
-              "title": "Schrijf op Tchap",
-              "description": "Directe uitwisseling met ons team"
-            },
-            "visio": {
-              "title": "Praten op Videogesprek",
-              "description": "20 min voor een diepgaand gesprek"
-            }
-          }
-        }
-      },
-      "feedback_widget": {
-        "shortTitle": "Feedback?",
-        "title": "Heeft u feedback?",
-        "placeholder": "Deel hier uw feedback...",
-        "email_placeholder": "Uw e-mailadres...",
-        "submit_text": "Feedback verzenden",
-        "success_text": "Bedankt voor uw feedback!",
-        "success_text2": "Indien u vragen heeft, nemen wij spoedig contact met u op."
-      },
-      "authentication": {
-        "error": {
-          "alpha": "Deze applicatie bevindt zich in de alfa-fase en de toegang ertoe is beperkt.",
-          "user_cannot_access_app": "U heeft niet de benodigde rechten om toegang te krijgen tot deze applicatie. Neem contact op met uw beheerder."
-        }
-      },
-      "mime": {
-        "calc": "Spreadsheet",
-        "doc": "Document",
-        "image": "Afbeelding",
-        "other": "overige",
-        "pdf": "PDF",
-        "powerpoint": "Presentatie",
-        "audio": "Audio",
-        "video": "Video",
-        "archive": "Archief"
-      },
-      "roles": {
-        "administrator": "Beheerder",
-        "editor": "Redacteur",
-        "reader": "Lezer",
-        "freebusy": "Alleen beschikbaarheid",
-        "owner": "Eigenaar"
-      },
-      "time": {
-        "years_ago_one": "{{count}} jaar geleden",
-        "years_ago_other": "{{count}} jaren geleden",
-        "months_ago_one": "{{count}} maand geleden",
-        "months_ago_other": "{{count}} maanden geleden",
-        "weeks_ago_one": "{{count}} week geleden",
-        "weeks_ago_other": "{{count}} weken geleden",
-        "days_ago_one": "{{count}} dag geleden",
-        "days_ago_other": "{{count}} dagen geleden",
-        "hours_ago_one": "{{count}} uur geleden",
-        "hours_ago_other": "{{count}} uren geleden",
-        "minutes_ago_one": "{{count}} minuut geleden",
-        "minutes_ago_other": "{{count}} minuten geleden",
-        "seconds_ago": "een paar seconden geleden"
-      },
-      "calendar": {
-        "error": {
-          "connection": "Kan geen verbinding maken met de kalenderserver. Probeer het later opnieuw.",
-          "fetchCalendars": "Kan kalenders niet laden. Probeer het later opnieuw."
-        },
-        "views": {
-          "day": "Dag",
-          "workWeek": "Werkweek",
-          "week": "Week",
-          "month": "Maand",
-          "listDay": "Dag lijst",
-          "listWeek": "Week lijst",
-          "listMonth": "Maand lijst",
-          "listYear": "Jaar lijst",
-          "today": "Vandaag",
-          "mobile": {
-            "oneDay": "Een dag",
-            "workWeek": "Werkweek",
-            "week": "Week",
-            "list": "Lijst",
-            "noEvents": "Geen evenementen"
-          }
-        },
-        "navigation": {
-          "previous": "Vorige",
-          "next": "Volgende"
-        },
-        "event": {
-          "createTitle": "Evenement aanmaken",
-          "editTitle": "Evenement bewerken",
-          "calendar": "Kalender",
-          "title": "Titel",
-          "titlePlaceholder": "Evenement titel",
-          "location": "Locatie",
-          "locationPlaceholder": "Locatie",
-          "openLocation": "Openen",
-          "description": "Beschrijving",
-          "descriptionPlaceholder": "Beschrijving",
-          "start": "Start",
-          "end": "Einde",
-          "endBeforeStart": "Eindtijd moet na starttijd zijn",
-          "allDay": "Hele dag",
-          "organizer": "Organisator",
-          "attendees": "Deelnemers",
-          "deleteConfirm": "Evenement verwijderen",
-          "deleteConfirmMessage": "Weet u zeker dat u dit evenement wilt verwijderen?",
-          "deleteRecurringPrompt": "Dit is een terugkerend evenement. Wat wilt u verwijderen?",
-          "deleteThisOccurrence": "Alleen deze gebeurtenis",
-          "deleteThisAndFuture": "Deze en toekomstige gebeurtenissen",
-          "deleteAllOccurrences": "Alle gebeurtenissen",
-          "editRecurringTitle": "Terugkerend evenement bewerken",
-          "editRecurringPrompt": "Dit is een terugkerend evenement. Wat wilt u bewerken?",
-          "editThisOccurrence": "Alleen deze gebeurtenis",
-          "editThisAndFuture": "Deze en toekomstige gebeurtenissen",
-          "editAllOccurrences": "Alle gebeurtenissen",
-          "enterChoice": "Voer uw keuze in (1, 2 of 3):",
-          "invalidChoice": "Ongeldige keuze. Voer 1, 2 of 3 in.",
-          "delete": "Verwijderen",
-          "cancel": "Annuleren",
-          "save": "Opslaan",
-          "create": "Aanmaken",
-          "sections": {
-            "addRecurrence": "Herhaling toevoegen",
-            "addLocation": "Locatie toevoegen",
-            "addVideoConference": "Meet",
-            "createVisio": "Add video conference",
-            "removeVisio": "Videoconferentie verwijderen",
-            "videoLink": "Videoconferentie link",
-            "addAttendees": "Deelnemers toevoegen",
-            "addResources": "Middelen toevoegen",
-            "addDescription": "Beschrijving toevoegen",
-            "addReminder": "Herinnering toevoegen",
-            "addAttachment": "Bijlage toevoegen",
-            "moreOptions": "Meer opties",
-            "reminder_one": "herinnering",
-            "reminder_other": "herinneringen",
-            "attachment_one": "bijlage",
-            "attachment_other": "bijlagen"
-          },
-          "reminders": {
-            "5min": "5 minuten voor",
-            "15min": "15 minuten voor",
-            "30min": "30 minuten voor",
-            "1hour": "1 uur voor",
-            "1day": "1 dag voor",
-            "1week": "1 week voor"
-          },
-          "status": {
-            "label": "Status",
-            "confirmed": "Bevestigd",
-            "tentative": "Voorlopig",
-            "cancelled": "Geannuleerd"
-          },
-          "visibility": {
-            "label": "Zichtbaarheid",
-            "public": "Openbaar",
-            "publicHelp": "Iedereen met wie de agenda wordt gedeeld ziet alle details.",
-            "private": "Privé",
-            "privateHelp": "Verborgen voor personen met alleen-lezentoegang. Personen die de agenda kunnen bewerken, en iedereen die voor het evenement is uitgenodigd, zien het wel.",
-            "confidential": "Vertrouwelijk",
-            "confidentialHelp": "Personen met alleen-lezentoegang zien alleen een bezet tijdvak, zonder details. Personen die de agenda kunnen bewerken, en genodigden, zien alles."
-          },
-          "availability": {
-            "label": "Beschikbaarheid",
-            "busy": "Bezet",
-            "free": "Vrij"
-          },
-          "send": "Verzenden",
-          "invitation": "Uitnodiging",
-          "organizedBy": "Georganiseerd door",
-          "accept": "Accepteren",
-          "maybe": "Misschien",
-          "decline": "Weigeren",
-          "accepted": "Geaccepteerd",
-          "tentative": "Misschien",
-          "declined": "Geweigerd",
-          "needsAction": "Geen antwoord",
-          "yourResponse": "Uw antwoord",
-          "cancelledNotice": "Dit evenement is geannuleerd.",
-          "rsvpRecurringTitle": "Antwoorden op terugkerend evenement",
-          "rsvpRecurringPrompt": "Dit is een terugkerend evenement. Pas uw antwoord toe op:"
-        },
-        "list": {
-          "defaultCalendarName": "Mijn kalender",
-          "myCalendars": "Mijn kalenders",
-          "sharedCalendars": "Gedeelde kalenders",
-          "shared": "(gedeeld)",
-          "unnamed": "Naamloze kalender",
-          "mailboxCalendar": "Gekoppeld aan mailbox: {{email}}",
-          "showCalendar": "Kalender tonen",
-          "edit": "Bewerken",
-          "delete": "Verwijderen",
-          "share": "Delen",
-          "import": "Evenementen importeren",
-          "subscription": "Abonnements-URL",
-          "moveUp": "Omhoog verplaatsen",
-          "moveDown": "Omlaag verplaatsen",
-          "options": "Opties"
-        },
-        "importEvents": {
-          "title": "Evenementen importeren",
-          "description": "Importeer evenementen vanuit een ICS-bestand in \"{{name}}\".",
-          "selectFile": "Bestand kiezen",
-          "import": "Importeren",
-          "resultHeader": "Importresultaten",
-          "imported": "evenementen geïmporteerd",
-          "duplicates": "evenementen bestonden al",
-          "skipped": "evenementen overgeslagen (niet-ondersteund formaat)",
-          "error": "Er is een fout opgetreden tijdens het importeren. Probeer het opnieuw.",
-          "errorDetails": "Foutdetails"
-        },
-        "subscription": {
-          "title": "Kalender-abonnements-URL",
-          "description": "Gebruik deze URL om u te abonneren op \"{{name}}\" vanuit externe kalendertoepassingen (Apple Calendar, Google Calendar, Outlook, etc.).",
-          "loading": "Abonnements-URL wordt gegenereerd...",
-          "copy": "Kopiëren",
-          "copied": "Gekopieerd!",
-          "close": "Sluiten",
-          "warning": "Deze URL bevat een privétoken. Iedereen met deze link kan uw kalender-evenementen bekijken.",
-          "regenerate": "URL regenereren",
-          "regenerateConfirm": {
-            "title": "Abonnements-URL regenereren?",
-            "message": "Dit maakt de huidige URL ongeldig. Externe kalenders die de oude URL gebruiken zullen niet meer synchroniseren.",
-            "confirm": "Regenereren"
-          },
-          "error": "Genereren van abonnements-URL mislukt. Probeer het opnieuw.",
-          "errorPermission": "U heeft geen toegang tot deze kalender.",
-          "errorNetwork": "Netwerkfout. Controleer uw verbinding en probeer het opnieuw.",
-          "errorServer": "Serverfout. Probeer het later opnieuw."
-        },
-        "leftPanel": {
-          "newEvent": "Nieuw evenement"
-        },
-        "miniCalendar": {
-          "previousMonth": "Vorige maand",
-          "nextMonth": "Volgende maand",
-          "weekAbbrev": "wk"
-        },
-        "recurrence": {
-          "label": "Herhalen",
-          "none": "Niet herhalen",
-          "daily": "Dagelijks",
-          "weekly": "Wekelijks",
-          "monthly": "Maandelijks",
-          "yearly": "Jaarlijks",
-          "custom": "Aangepast...",
-          "everyLabel": "Herhaal elke",
-          "days": "dagen",
-          "weeks": "weken",
-          "months": "maanden",
-          "years": "jaren",
-          "repeatOn": "Herhaal op",
-          "repeatOnDay": "Herhaal op dag",
-          "repeatOnDate": "Herhaal op datum",
-          "dayOfMonth": "Dag",
-          "endsLabel": "Eindigt",
-          "never": "Nooit",
-          "on": "Op",
-          "after": "Na",
-          "occurrences": "keer",
-          "weekdays": {
-            "mo": "M",
-            "tu": "D",
-            "we": "W",
-            "th": "D",
-            "fr": "V",
-            "sa": "Z",
-            "su": "Z"
-          },
-          "monthNames": {
-            "january": "Januari",
-            "february": "Februari",
-            "march": "Maart",
-            "april": "April",
-            "may": "Mei",
-            "june": "Juni",
-            "july": "Juli",
-            "august": "Augustus",
-            "september": "September",
-            "october": "Oktober",
-            "november": "November",
-            "december": "December"
-          },
-          "warnings": {
-            "februaryMax": "Februari heeft maximaal 29 dagen",
-            "leapYear": "Deze datum (29 februari) bestaat alleen in schrikkeljaren",
-            "monthMax30": "Deze maand heeft maximaal 30 dagen",
-            "dayMax31": "Dag moet tussen 1 en 31 zijn"
-          },
-          "advancedPropertiesWarning": "Dit herhalingspatroon gebruikt geavanceerde eigenschappen die hier niet volledig bewerkt kunnen worden. Opslaan kan het patroon vereenvoudigen."
-        },
-        "createCalendar": {
-          "title": "Kalender aanmaken",
-          "name": "Naam",
-          "namePlaceholder": "Kalender naam",
-          "nameRequired": "Naam is verplicht",
-          "color": "Kleur",
-          "description": "Beschrijving",
-          "descriptionPlaceholder": "Kalender beschrijving (optioneel)",
-          "cancel": "Annuleren",
-          "create": "Aanmaken",
-          "defaultName": "Mijn kalender",
-          "mailbox": "Verzendidentiteit",
-          "noMailbox": "Geen (zelfstandige kalender)",
-          "noMailboxHint": "Uitnodigingen worden verzonden vanaf het systeemadres.",
-          "mailboxHint": "Uitnodigingen worden verzonden vanaf {{email}} en de kalender wordt gedeeld met alle mailboxgebruikers.",
-          "noMailboxAvailable": "Uitnodigingen worden verzonden vanaf het systeemadres."
-        },
-        "onboarding": {
-          "title": "Welkom! Maak je eerste kalender aan",
-          "description": "Kies een verzendidentiteit voor je kalender. Dit bepaalt welk e-mailadres wordt gebruikt voor het verzenden van uitnodigingen.",
-          "noMailboxesMessage": "Je hebt geen toegang tot mailboxen op Messages, dus alle uitnodigingen worden verzonden vanaf het systeemadres."
-        },
-        "editCalendar": {
-          "title": "Kalender bewerken",
-          "save": "Opslaan",
-          "linkedMailbox": "Gekoppeld aan mailbox {{email}}",
-          "includeInAvailability": "Opnemen in beschikbaarheid"
-        },
-        "deleteCalendar": {
-          "title": "Kalender verwijderen",
-          "message": "Weet u zeker dat u de kalender \"{{name}}\" wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
-          "confirm": "Verwijderen"
-        },
-        "shareCalendar": {
-          "title": "Kalender delen",
-          "emailPlaceholder": "Voer e-mailadres in",
-          "share": "Delen",
-          "hint": "De persoon krijgt dezelfde rechten als u (lezen en schrijven).",
-          "success": "Kalender gedeeld met {{email}}",
-          "error": "Delen van kalender mislukt",
-          "invalidEmail": "Voer een geldig e-mailadres in",
-          "syncManagedHint": "Beheerd door Messages.",
-          "mailboxInfoAdmin": "Deze kalender is gekoppeld aan mailbox {{email}}. Je kunt hieronder alleen-lezen toegang toevoegen. Schrijftoegang wordt beheerd in Messages.",
-          "mailboxInfoReadonly": "Deze kalender is gekoppeld aan mailbox {{email}}. Delen wordt beheerd in Messages."
-        },
-        "attendees": {
-          "label": "Deelnemers uitnodigen",
-          "placeholder": "Voer e-mailadres in en druk op Enter",
-          "add": "Toevoegen",
-          "remove": "Deelnemer verwijderen",
-          "invalidEmail": "Voer een geldig e-mailadres in",
-          "alreadyAdded": "Dit e-mailadres staat al in de lijst",
-          "cannotAddOrganizer": "U kunt uzelf niet als deelnemer toevoegen",
-          "participants": "Deelnemers",
-          "organizer": "Organisator",
-          "viewProfile": "Profiel bekijken",
-          "cannotRemoveOrganizer": "Kan organisator niet verwijderen",
-          "noResults": "Geen gebruikers gevonden",
-          "sentFrom": "Uitnodiging wordt verzonden vanaf {{email}}"
-        },
-        "resources": {
-          "placeholder": "Selecteer een middel...",
-          "remove": "Middel verwijderen"
-        },
-        "weekdaysFull": {
-          "monday": "maandag",
-          "tuesday": "dinsdag",
-          "wednesday": "woensdag",
-          "thursday": "donderdag",
-          "friday": "vrijdag",
-          "saturday": "zaterdag",
-          "sunday": "zondag"
-        }
-      },
-      "email": {
-        "subject": {
-          "invitation": "Uitnodiging: {{summary}}",
-          "update": "Bijgewerkte uitnodiging: {{summary}}",
-          "cancel": "Geannuleerd: {{summary}}",
-          "reply": "Antwoord: {{summary}}"
-        },
-        "noTitle": "(Geen titel)",
-        "allDay": "Hele dag",
-        "invitation": {
-          "title": "Uitnodiging voor evenement",
-          "heading": "Uitnodiging voor evenement",
-          "badge": "Uitnodiging voor evenement",
-          "body": "{{organizer}} nodigt u uit voor een evenement"
-        },
-        "update": {
-          "title": "Evenement bijgewerkt",
-          "heading": "Evenement bijgewerkt",
-          "badge": "UITNODIGING BIJGEWERKT",
-          "body": "{{organizer}} heeft een evenement bijgewerkt waarvoor u bent uitgenodigd"
-        },
-        "cancel": {
-          "title": "Evenement geannuleerd",
-          "heading": "Evenement geannuleerd",
-          "badge": "UITNODIGING GEANNULEERD",
-          "body": "{{organizer}} heeft dit evenement geannuleerd"
-        },
-        "reply": {
-          "title": "Antwoord op evenement",
-          "heading": "Antwoord ontvangen",
-          "badge": "Antwoord",
-          "body": "{{attendee}} heeft gereageerd op uw evenement"
-        },
-        "labels": {
-          "when": "Wanneer",
-          "until": "tot",
-          "location": "Locatie",
-          "videoConference": "Videoconferentie",
-          "organizer": "Organisator",
-          "attendee": "Deelnemer",
-          "description": "Beschrijving",
-          "wasScheduledFor": "Was gepland op"
-        },
-        "actions": {
-          "accept": "Accepteren",
-          "maybe": "Misschien",
-          "decline": "Weigeren"
-        },
-        "instructions": {
-          "invitation": "U kunt ook het bijgevoegde .ics-bestand openen met uw agendatoepassing.",
-          "update": "Dit evenement is bijgewerkt. U kunt ook het bijgevoegde .ics-bestand openen om uw agenda bij te werken.",
-          "cancel": "Dit evenement is geannuleerd. Open het bijgevoegde .ics-bestand om het uit uw agenda te verwijderen.",
-          "reply": "Het antwoord van de deelnemer is geregistreerd. Open het bijgevoegde .ics-bestand om uw agenda bij te werken."
-        },
-        "footer": {
-          "invitation": "Deze uitnodiging is verzonden via {{appName}}",
-          "notification": "Deze melding is verzonden via {{appName}}"
-        },
-        "replyTo": {
-          "body": "{{attendee}} heeft gereageerd op uw evenement: {{summary}}",
-          "details": "Evenementdetails",
-          "instruction": "Het antwoord van de deelnemer is geregistreerd in het bijgevoegde .ics-bestand."
-        },
-        "cancelDetails": {
-          "body": "{{organizer}} heeft het evenement geannuleerd: {{summary}}",
-          "details": "Details van het geannuleerde evenement",
-          "instruction": "Dit evenement is geannuleerd. U kunt het uit uw agenda verwijderen door het bijgevoegde .ics-bestand te openen."
-        },
-        "updateDetails": {
-          "body": "{{organizer}} heeft het evenement bijgewerkt",
-          "details": "Bijgewerkte evenementdetails"
-        },
-        "invitationDetails": {
-          "body": "{{organizer}} nodigt u uit voor een evenement",
-          "details": "Evenementdetails",
-          "respond": "Reageer op deze uitnodiging:"
-        }
-      },
-      "rsvp": {
-        "accepted": "U heeft de uitnodiging geaccepteerd",
-        "tentative": "U heeft \"misschien\" geantwoord op de uitnodiging",
-        "declined": "U heeft de uitnodiging afgewezen",
-        "processing": "Uw antwoord wordt verzonden…",
-        "responseSent": "Uw antwoord is naar de organisator gestuurd.",
-        "failed": "Het verzenden van uw antwoord is mislukt. Probeer het opnieuw.",
-        "error": {
-          "title": "Fout",
-          "invalidLink": "Ongeldige link",
-          "invalidAction": "Ongeldige actie.",
-          "invalidToken": "Deze link is ongeldig of verlopen.",
-          "invalidPayload": "Deze link is ongeldig.",
-          "eventNotFound": "Het evenement is niet gevonden. Het is mogelijk verwijderd.",
-          "eventPast": "Dit evenement is al voorbij.",
-          "notAttendee": "U staat niet vermeld als deelnemer van dit evenement.",
-          "updateFailed": "Er is een fout opgetreden bij het bijwerken. Probeer het opnieuw.",
-          "tokenExpired": "Deze link is verlopen. Vraag de organisator om een nieuwe uitnodiging.",
-          "rateLimited": "Te veel verzoeken. Wacht even en probeer het opnieuw."
-        }
-      },
-      "resources": {
-        "title": "Middelen",
-        "description": "Vergaderruimtes en gedeelde middelen beheren.",
-        "search": "Middelen zoeken...",
-        "loading": "Middelen laden...",
-        "empty": "Er zijn nog geen middelen aangemaakt.",
-        "noResults": "Geen middelen gevonden.",
-        "types": {
-          "room": "Ruimte",
-          "resource": "Middel"
-        },
-        "filters": {
-          "all": "Alle"
-        },
-        "create": {
-          "button": "Middel toevoegen",
-          "title": "Middel aanmaken",
-          "nameLabel": "Naam",
-          "typeLabel": "Type",
-          "submit": "Aanmaken",
-          "success": "Middel succesvol aangemaakt.",
-          "error": "Middel aanmaken mislukt."
-        },
-        "delete": {
-          "button": "Verwijderen",
-          "title": "Middel verwijderen",
-          "message": "Weet u zeker dat u \"{{name}}\" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
-          "confirm": "Verwijderen",
-          "success": "Middel succesvol verwijderd.",
-          "error": "Middel verwijderen mislukt."
-        }
-      },
-      "integrations": {
-        "title": "Integraties",
-        "description": "Beheer integratiekanalen zodat externe diensten toegang hebben tot uw agenda's.",
-        "loading": "Integraties laden...",
-        "empty": "Er zijn nog geen integraties aangemaakt.",
-        "scopes": {
-          "calendars_read": "Agenda's lezen",
-          "calendars_write": "Agenda's bewerken",
-          "events_read": "Evenementen lezen",
-          "events_write": "Evenementen bewerken",
-          "edit": "Rechten bewerken",
-          "updateSuccess": "Rechten succesvol bijgewerkt.",
-          "updateError": "Rechten bijwerken mislukt."
-        },
-        "lastUsed": "Laatst gebruikt: {{date}}",
-        "create": {
-          "button": "Integratie toevoegen",
-          "title": "Integratie aanmaken",
-          "chooseType": "Kies het type integratie dat u wilt aanmaken.",
-          "nameLabel": "Naam",
-          "submit": "Aanmaken",
-          "success": "Integratie succesvol aangemaakt.",
-          "error": "Integratie aanmaken mislukt.",
-          "tokenTitle": "Integratietoken",
-          "tokenWarning": "Kopieer dit token nu. Het wordt niet meer getoond."
-        },
-        "types": {
-          "caldav": {
-            "title": "CalDAV-inloggegevens",
-            "description": "Genereer een gebruikersnaam en wachtwoord om externe agendaclients (Thunderbird, Apple Calendar, enz.) via CalDAV te verbinden."
-          },
-          "ical-feed": {
-            "title": "iCal-abonnement"
-          },
-          "webhook": {
-            "title": "Webhook",
-            "description": "Stuur evenementwijzigingen via HTTP naar een extern endpoint."
-          }
-        },
-        "delete": {
-          "button": "Verwijderen",
-          "title": "Integratie verwijderen",
-          "message": "Weet u zeker dat u \"{{name}}\" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
-          "confirm": "Verwijderen",
-          "success": "Integratie succesvol verwijderd.",
-          "error": "Integratie verwijderen mislukt."
-        },
-        "regenerate": {
-          "title": "Token opnieuw genereren",
-          "description": "Geeft een nieuw token uit. Het oude stopt onmiddellijk met werken.",
-          "button": "Opnieuw genereren",
-          "success": "Token succesvol opnieuw gegenereerd.",
-          "error": "Token opnieuw genereren mislukt.",
-          "tokenTitle": "Nieuw integratietoken",
-          "tokenWarning": "Kopieer dit nieuwe token nu. Het wordt niet meer getoond."
-        },
-        "edit": {
-          "button": "Bewerken",
-          "title": "Integratie bewerken",
-          "activeLabel": "Actief",
-          "inactiveBadge": "Uitgeschakeld",
-          "success": "Integratie succesvol bijgewerkt.",
-          "error": "Integratie bijwerken mislukt."
-        },
-        "columns": {
-          "name": "Naam",
-          "type": "Type",
-          "scopes": "Rechten",
-          "lastUsed": "Laatst gebruikt"
-        },
-        "token": {
-          "copy": "Token kopiëren",
-          "copied": "Token gekopieerd naar klembord."
-        },
-        "caldav": {
-          "serverUrl": "Server-URL",
-          "username": "Gebruikersnaam",
-          "password": "Wachtwoord"
-        }
-      },
-      "scheduling": {
-        "findATime": "Zoek een tijdstip",
-        "previousDay": "Vorige dag",
-        "nextDay": "Volgende dag",
-        "noConflicts": "Geen conflicten",
-        "conflicts": "{{count}} conflict(en)",
-        "addAttendeesToSeeAvailability": "Voeg deelnemers toe om beschikbaarheid te zien"
-      },
-      "app_switcher": {
-        "you_are_in": "JE BENT IN",
-        "jump_to": "GA NAAR",
-        "switch_app": "App wisselen",
-        "apps": {
-          "epicentre": {
-            "label": "Hub",
-            "subtitle": "Start"
-          },
-          "docs": {
-            "label": "Docs",
-            "subtitle": "Documenten"
-          },
-          "drive": {
-            "label": "Drive",
-            "subtitle": "Bestanden"
-          },
-          "meet": {
-            "label": "Meet",
-            "subtitle": "Videogesprekken"
-          },
-          "mail": {
-            "label": "Mail",
-            "subtitle": "E-mail"
-          },
-          "calendar": {
-            "label": "Calendar",
-            "subtitle": "Agenda"
-          },
-          "chat": {
-            "label": "Chat",
-            "subtitle": "Berichten"
-          },
-          "commander": {
-            "label": "Commander",
-            "subtitle": "Beheer"
           }
         }
       }

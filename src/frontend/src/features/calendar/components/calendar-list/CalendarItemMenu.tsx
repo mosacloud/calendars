@@ -1,12 +1,17 @@
 /**
  * CalendarItemMenu component.
- * Context menu for calendar item actions (edit, delete, subscription).
+ * Context menu for calendar item actions (edit, hide, delete or leave, subscription).
  */
 
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { DropdownMenu, DropdownMenuOption, Icon, IconType } from "@gouvfr-lasuite/ui-kit";
-import { Button } from "@gouvfr-lasuite/cunningham-react";
+import {
+  DropdownMenu,
+  DropdownMenuOption,
+  Icon,
+  IconType,
+  Button,
+} from "@gouvfr-lasuite/ui-components";
 import {
   ArrowDown,
   ArrowUp,
@@ -15,15 +20,20 @@ import {
   MoreVertical,
   Trash,
   Upload,
-} from "@gouvfr-lasuite/ui-kit/icons";
+} from "@gouvfr-lasuite/ui-components/icons";
 
 import type { CalendarItemMenuProps } from "./types";
+import { getDeleteMenuEntry } from "./utils";
 
 export const CalendarItemMenu = ({
   isOpen,
   onOpenChange,
   onEdit,
   onDelete,
+  onLeave,
+  syncManaged,
+  onDeleteForMailbox,
+  onHide,
   onShare,
   onImport,
   onSubscription,
@@ -81,14 +91,38 @@ export const CalendarItemMenu = ({
       });
     }
 
-    items.push({
-      label: t("calendar.list.delete"),
-      icon: <Trash />,
-      callback: onDelete,
-    });
+    if (onHide) {
+      items.push({
+        label: t("calendar.list.hide"),
+        icon: <Icon name="visibility_off" type={IconType.OUTLINED} aria-hidden />,
+        callback: onHide,
+      });
+    }
+
+    const deleteEntry = getDeleteMenuEntry({ onDelete, onLeave, syncManaged, onDeleteForMailbox });
+    if (deleteEntry) {
+      items.push({
+        label: t(deleteEntry.labelKey),
+        icon: <Trash />,
+        callback: deleteEntry.callback,
+      });
+    }
 
     return items;
-  }, [t, onEdit, onDelete, onShare, onImport, onSubscription, onMoveUp, onMoveDown]);
+  }, [
+    t,
+    onEdit,
+    onDelete,
+    onLeave,
+    syncManaged,
+    onDeleteForMailbox,
+    onHide,
+    onShare,
+    onImport,
+    onSubscription,
+    onMoveUp,
+    onMoveDown,
+  ]);
 
   return (
     <DropdownMenu options={options} isOpen={isOpen} onOpenChange={onOpenChange}>
