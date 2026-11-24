@@ -26,6 +26,8 @@
   "dependencies": {
     "@event-calendar/core": "5.7.1",
     "@fontsource/material-icons": "5.2.5",
+    "@fontsource/open-sans": "5.2.7",
+    "@fontsource/poppins": "5.2.7",
     "@gouvfr-lasuite/ui-components": "1.4.0",
     "@tanstack/react-query": "5.101.0",
     "@tanstack/react-router": "1.170.15",
